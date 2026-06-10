@@ -643,6 +643,8 @@
     .side-panel { max-height: 220px; }
   }
 </style>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/face_mesh.js" crossorigin="anonymous"></script>
 </head>
 <body>
 
@@ -802,6 +804,10 @@ let wordCount = 0;
 let apiCalls = 0;
 let isAnalyzing = false;
 let lastText = '';
+let faceMesh = null;
+let mpCamera = null;
+let currentLandmarks = null; // latest face landmarks from MediaPipe
+let isAnalyzing2 = false;    // alias guard
 
 // ── Elements ─────────────────────────────────────────
 const video = document.getElementById('video');
@@ -816,16 +822,25 @@ const scanLine = document.getElementById('scan-line');
 const procBadge = document.getElementById('proc-badge');
 const latencyBadge = document.getElementById('latency-badge');
 
+// ── MediaPipe lip landmark indices ────────────────────
+// Outer lip contour (61 points around the mouth)
+const LIPS_OUTER = [61,185,40,39,37,0,267,269,270,409,291,375,321,405,314,17,84,181,91,146];
+// Inner lip contour
+const LIPS_INNER = [78,191,80,81,82,13,312,311,310,415,308,324,318,402,317,14,87,178,88,95];
+// Key landmark pairs for mouth openness
+const MOUTH_TOP    = 13;
+const MOUTH_BOTTOM = 14;
+const MOUTH_LEFT   = 61;
+const MOUTH_RIGHT  = 291;
+
 // ── Setup Screen ──────────────────────────────────────
 document.getElementById('toggle-vis').addEventListener('click', () => {
   const inp = document.getElementById('api-key-input');
   inp.type = inp.type === 'password' ? 'text' : 'password';
 });
-
 document.getElementById('api-key-input').addEventListener('keydown', e => {
   if (e.key === 'Enter') confirmKey();
 });
-
 document.getElementById('btn-confirm-key').addEventListener('click', confirmKey);
 
 function confirmKey() {
@@ -860,7 +875,155 @@ document.querySelectorAll('.ivbtn').forEach(btn => {
   });
 });
 
-// ── Camera ────────────────────────────────────────────
+// ── MediaPipe Face Mesh setup ─────────────────────────
+function initFaceMesh() {
+  faceMesh = new FaceMesh({
+    locateFile: file =>
+      `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${file}`
+  });
+  faceMesh.setOptions({
+    maxNumFaces: 1,
+    refineLandmarks: true,   // enables detailed lip & iris landmarks
+    minDetectionConfidence: 0.5,
+    minTrackingConfidence: 0.5
+  });
+  faceMesh.onResults(onFaceResults);
+}
+
+function onFaceResults(results) {
+  if (!isRunning) return;
+
+  const W = canvas.width  = video.videoWidth  || 640;
+  const H = canvas.height = video.videoHeight || 480;
+  ctx.clearRect(0, 0, W, H);
+
+  if (results.multiFaceLandmarks && results.multiFaceLandmarks.length > 0) {
+    currentLandmarks = results.multiFaceLandmarks[0];
+    drawLandmarks(currentLandmarks, W, H);
+  } else {
+    currentLandmarks = null;
+    // No face — draw faint guide oval
+    drawGuideOval(W, H);
+  }
+}
+
+// ── Draw real lip landmarks ───────────────────────────
+function drawLandmarks(landmarks, W, H) {
+  const analyzing = isAnalyzing;
+
+  // ── Helper: landmark px coords ──
+  const px = i => landmarks[i].x * W;
+  const py = i => landmarks[i].y * H;
+
+  // Mouth openness ratio
+  const mHeight = Math.abs(py(MOUTH_TOP) - py(MOUTH_BOTTOM));
+  const mWidth  = Math.abs(px(MOUTH_RIGHT) - px(MOUTH_LEFT));
+  const openRatio = mHeight / (mWidth + 0.001);
+  const isSpeaking = openRatio > 0.12;
+
+  // ── Subtle face mesh (cheeks & jaw only) ──
+  const FACE_OVAL = [10,338,297,332,284,251,389,356,454,323,361,288,397,365,379,378,400,377,152,148,176,149,150,136,172,58,132,93,234,127,162,21,54,103,67,109];
+  ctx.beginPath();
+  FACE_OVAL.forEach((idx, i) => {
+    i === 0 ? ctx.moveTo(px(idx), py(idx)) : ctx.lineTo(px(idx), py(idx));
+  });
+  ctx.closePath();
+  ctx.strokeStyle = analyzing ? 'rgba(108,92,231,0.35)' : 'rgba(108,92,231,0.15)';
+  ctx.lineWidth = 1;
+  ctx.stroke();
+
+  // ── Outer lip contour ──
+  ctx.beginPath();
+  LIPS_OUTER.forEach((idx, i) => {
+    i === 0 ? ctx.moveTo(px(idx), py(idx)) : ctx.lineTo(px(idx), py(idx));
+  });
+  ctx.closePath();
+
+  if (isSpeaking) {
+    // Glowing fill when speaking
+    const grad = ctx.createRadialGradient(
+      px(MOUTH_TOP), py(MOUTH_TOP), 0,
+      px(MOUTH_TOP), py(MOUTH_TOP), mWidth * 0.6
+    );
+    grad.addColorStop(0, 'rgba(0,206,201,0.18)');
+    grad.addColorStop(1, 'rgba(0,206,201,0)');
+    ctx.fillStyle = grad;
+    ctx.fill();
+  }
+
+  ctx.strokeStyle = isSpeaking
+    ? (analyzing ? 'rgba(0,206,201,1)' : 'rgba(0,206,201,0.75)')
+    : 'rgba(0,206,201,0.35)';
+  ctx.lineWidth = isSpeaking ? 2 : 1.2;
+  ctx.stroke();
+
+  // ── Inner lip contour ──
+  ctx.beginPath();
+  LIPS_INNER.forEach((idx, i) => {
+    i === 0 ? ctx.moveTo(px(idx), py(idx)) : ctx.lineTo(px(idx), py(idx));
+  });
+  ctx.closePath();
+  ctx.strokeStyle = isSpeaking
+    ? 'rgba(253,121,168,0.9)'
+    : 'rgba(253,121,168,0.3)';
+  ctx.lineWidth = isSpeaking ? 1.5 : 0.8;
+  ctx.stroke();
+
+  // ── Landmark dots on key lip points ──
+  const KEY_DOTS = [61, 291, 0, 17, 13, 14, 78, 308];
+  KEY_DOTS.forEach(idx => {
+    ctx.beginPath();
+    ctx.arc(px(idx), py(idx), isSpeaking ? 3 : 2, 0, Math.PI * 2);
+    ctx.fillStyle = isSpeaking
+      ? (analyzing ? '#00cec9' : 'rgba(0,206,201,0.8)')
+      : 'rgba(0,206,201,0.3)';
+    ctx.fill();
+  });
+
+  // ── Mouth openness bar (top-left HUD) ──
+  drawMouthHUD(openRatio, isSpeaking, W, H);
+}
+
+function drawMouthHUD(ratio, speaking, W, H) {
+  const barW = 80, barH = 6;
+  const x = 14, y = H - 28;
+  const fill = Math.min(1, ratio / 0.35);
+
+  ctx.fillStyle = 'rgba(7,7,13,0.65)';
+  ctx.beginPath();
+  ctx.roundRect(x - 6, y - 16, barW + 60, 28, 6);
+  ctx.fill();
+
+  ctx.fillStyle = 'rgba(255,255,255,0.12)';
+  ctx.fillRect(x, y, barW, barH);
+
+  const color = speaking ? '#00cec9' : '#6c5ce7';
+  ctx.fillStyle = color;
+  ctx.fillRect(x, y, barW * fill, barH);
+
+  ctx.fillStyle = speaking ? '#00cec9' : '#7a7a95';
+  ctx.font = '600 10px Space Grotesk, sans-serif';
+  ctx.fillText(speaking ? 'SPEAKING' : 'SILENT', x + barW + 8, y + 5);
+}
+
+function drawGuideOval(W, H) {
+  const cx = W / 2, cy = H * 0.45;
+  ctx.beginPath();
+  ctx.ellipse(cx, cy, W * 0.18, H * 0.26, 0, 0, Math.PI * 2);
+  ctx.strokeStyle = 'rgba(108,92,231,0.15)';
+  ctx.setLineDash([5, 5]);
+  ctx.lineWidth = 1;
+  ctx.stroke();
+  ctx.setLineDash([]);
+
+  ctx.fillStyle = 'rgba(122,122,149,0.4)';
+  ctx.font = '12px Space Grotesk, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillText('얼굴을 카메라 앞에 위치시키세요', cx, cy + H * 0.3);
+  ctx.textAlign = 'left';
+}
+
+// ── Camera & MediaPipe Camera ─────────────────────────
 async function startCamera() {
   try {
     stream = await navigator.mediaDevices.getUserMedia({
@@ -871,8 +1034,17 @@ async function startCamera() {
     await new Promise(r => { video.onloadedmetadata = r; });
     document.getElementById('camera-wrap').style.display = 'block';
     document.getElementById('cam-placeholder').style.display = 'none';
-    canvas.width = video.videoWidth || 640;
+    canvas.width  = video.videoWidth  || 640;
     canvas.height = video.videoHeight || 480;
+
+    // Start MediaPipe Camera helper (feeds frames into FaceMesh)
+    mpCamera = new Camera(video, {
+      onFrame: async () => {
+        if (faceMesh && isRunning) await faceMesh.send({ image: video });
+      },
+      width: 640, height: 360
+    });
+    await mpCamera.start();
     return true;
   } catch (e) {
     showToast('📷 카메라 접근이 거부됐습니다');
@@ -881,32 +1053,60 @@ async function startCamera() {
 }
 
 function stopCamera() {
-  if (stream) { stream.getTracks().forEach(t => t.stop()); stream = null; }
+  if (mpCamera) { mpCamera.stop(); mpCamera = null; }
+  if (stream)   { stream.getTracks().forEach(t => t.stop()); stream = null; }
+  currentLandmarks = null;
   document.getElementById('camera-wrap').style.display = 'none';
   document.getElementById('cam-placeholder').style.display = 'flex';
 }
 
-// ── Capture & Analyze ─────────────────────────────────
+// ── Capture frame for Gemini (cropped to mouth region) ─
 function captureFrame() {
-  // Draw current video frame to offscreen canvas
   const offscreen = document.createElement('canvas');
-  offscreen.width = 480;
-  offscreen.height = 270;
-  const oc = offscreen.getContext('2d');
-  // Mirror-correct for capture (video CSS is mirrored, but capture is raw)
-  oc.scale(-1, 1);
-  oc.drawImage(video, -480, 0, 480, 270);
-  return offscreen.toDataURL('image/jpeg', 0.75).split(',')[1];
+  const W = video.videoWidth  || 640;
+  const H = video.videoHeight || 480;
+
+  // If landmarks available, crop tightly around mouth (+40% padding)
+  if (currentLandmarks) {
+    const px = i => currentLandmarks[i].x * W;
+    const py = i => currentLandmarks[i].y * H;
+
+    const allX = LIPS_OUTER.map(px);
+    const allY = LIPS_OUTER.map(py);
+    const minX = Math.min(...allX), maxX = Math.max(...allX);
+    const minY = Math.min(...allY), maxY = Math.max(...allY);
+    const padX = (maxX - minX) * 0.7;
+    const padY = (maxY - minY) * 0.9;
+
+    const sx = Math.max(0, minX - padX);
+    const sy = Math.max(0, minY - padY);
+    const sw = Math.min(W - sx, (maxX - minX) + padX * 2);
+    const sh = Math.min(H - sy, (maxY - minY) + padY * 2);
+
+    // Output square-ish crop, 256×256
+    offscreen.width = 256; offscreen.height = 256;
+    const oc = offscreen.getContext('2d');
+    // Flip horizontally to match visual (video CSS is mirrored)
+    oc.translate(256, 0); oc.scale(-1, 1);
+    oc.drawImage(video, sx, sy, sw, sh, 0, 0, 256, 256);
+  } else {
+    // Fallback: full frame
+    offscreen.width = 480; offscreen.height = 270;
+    const oc = offscreen.getContext('2d');
+    oc.scale(-1, 1);
+    oc.drawImage(video, -480, 0, 480, 270);
+  }
+
+  return offscreen.toDataURL('image/jpeg', 0.82).split(',')[1];
 }
 
+// ── Capture & Analyze ─────────────────────────────────
 async function captureAndAnalyze() {
   if (isAnalyzing || !isRunning) return;
   isAnalyzing = true;
 
-  // Visual feedback
   procBadge.classList.add('show');
   triggerScan();
-  drawOverlay(true);
 
   const t0 = Date.now();
 
@@ -922,8 +1122,6 @@ async function captureAndAnalyze() {
       lastText = result;
       showSubtitle(result);
       addLog(result, latency);
-    } else if (!result || result === '[silence]') {
-      // Mouth closed / no speech — keep last subtitle briefly
     }
     apiCalls++;
     document.getElementById('stat-api').textContent = apiCalls;
@@ -938,27 +1136,29 @@ async function captureAndAnalyze() {
   }
 
   procBadge.classList.remove('show');
-  drawOverlay(false);
   isAnalyzing = false;
 }
 
 // ── Gemini API Call ───────────────────────────────────
 async function callGemini(imageB64) {
-  const prompt = `You are an expert lip reader. Look at this image of a person's face.
+  const useCrop = !!currentLandmarks;
+  const prompt = useCrop
+    ? `You are an expert lip reader. This is a close-up crop of a person's mouth area.
 
-Your task: Read what the person is CURRENTLY saying by analyzing their lip and mouth position.
+Read what the person is CURRENTLY saying from the lip shape and position.
 
 Rules:
-- Output ONLY the spoken English words you can read from the lips
-- If the mouth appears closed or the person is not speaking, output exactly: [silence]
-- If you can partially read lips, output what you can
-- Do NOT describe the image
-- Do NOT add explanations, punctuation notes, or labels
-- Keep output to 1-10 words maximum
-- Output in plain text only`;
+- Output ONLY the English words you can read from the lips
+- If mouth is closed or person is not speaking, output exactly: [silence]
+- No descriptions, no labels, no punctuation notes
+- 1–10 words maximum, plain text only`
+    : `You are an expert lip reader. Look at this person's face and read their lips.
+
+Output ONLY the English words being spoken, or [silence] if mouth is closed.
+Plain text, 1–10 words maximum.`;
 
   const res = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
+    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
     {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -969,11 +1169,7 @@ Rules:
             { text: prompt }
           ]
         }],
-        generationConfig: {
-          temperature: 0.1,
-          maxOutputTokens: 60,
-          candidateCount: 1
-        }
+        generationConfig: { temperature: 0.1, maxOutputTokens: 60 }
       })
     }
   );
@@ -982,7 +1178,6 @@ Rules:
     const err = await res.json();
     throw new Error(err.error?.message || `HTTP ${res.status}`);
   }
-
   const data = await res.json();
   return data.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || '';
 }
@@ -992,8 +1187,6 @@ function showSubtitle(text) {
   liveSubtitle.textContent = text;
   subtitleBox.classList.add('fresh');
   setTimeout(() => subtitleBox.classList.remove('fresh'), 600);
-
-  // Auto-fade after 4s
   clearTimeout(showSubtitle._timer);
   showSubtitle._timer = setTimeout(() => {
     if (liveSubtitle.textContent === text) liveSubtitle.textContent = '—';
@@ -1002,13 +1195,11 @@ function showSubtitle(text) {
 
 function addLog(text, latencyMs) {
   document.getElementById('empty-log')?.remove();
-
   transcripts.push({ text, time: new Date() });
   wordCount += text.split(/\s+/).filter(Boolean).length;
 
   const item = document.createElement('div');
   item.className = 'log-item';
-
   const elapsed = startTime ? formatTime(Date.now() - startTime) : '0:00';
   const conf = Math.min(100, Math.max(30, 100 - (latencyMs - 500) / 30));
   const confColor = conf > 70 ? '#00cec9' : conf > 45 ? '#ffd166' : '#ff4d6d';
@@ -1022,51 +1213,10 @@ function addLog(text, latencyMs) {
   item.addEventListener('click', () => {
     navigator.clipboard.writeText(text).then(() => showToast('✅ Copied'));
   });
-
   logEl.appendChild(item);
   logEl.scrollTop = logEl.scrollHeight;
-
   document.getElementById('stat-words').textContent = wordCount;
   document.getElementById('stat-lines').textContent = transcripts.length;
-}
-
-function drawOverlay(analyzing) {
-  if (!video.videoWidth) return;
-  canvas.width = video.videoWidth;
-  canvas.height = video.videoHeight;
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-  const cx = canvas.width / 2;
-  const cy = canvas.height * 0.47;
-  const rw = canvas.width * 0.2;
-  const rh = canvas.height * 0.28;
-
-  // Face oval
-  ctx.beginPath();
-  ctx.ellipse(cx, cy, rw, rh, 0, 0, Math.PI * 2);
-  ctx.strokeStyle = analyzing ? 'rgba(108,92,231,0.6)' : 'rgba(108,92,231,0.18)';
-  ctx.lineWidth = 1.5;
-  ctx.setLineDash(analyzing ? [] : [6, 4]);
-  ctx.stroke();
-  ctx.setLineDash([]);
-
-  // Lip ellipse
-  const ly = cy + rh * 0.44;
-  const lw = rw * 0.48;
-  const lh = lw * 0.3;
-  ctx.beginPath();
-  ctx.ellipse(cx, ly, lw, lh, 0, 0, Math.PI * 2);
-  ctx.strokeStyle = analyzing ? 'rgba(0,206,201,0.8)' : 'rgba(0,206,201,0.25)';
-  ctx.lineWidth = 1.8;
-  ctx.stroke();
-
-  // Corner markers
-  [[cx - lw, ly], [cx + lw, ly], [cx, ly - lh], [cx, ly + lh]].forEach(([x, y]) => {
-    ctx.beginPath();
-    ctx.arc(x, y, 3.5, 0, Math.PI * 2);
-    ctx.fillStyle = analyzing ? 'rgba(0,206,201,0.9)' : 'rgba(0,206,201,0.3)';
-    ctx.fill();
-  });
 }
 
 function triggerScan() {
@@ -1099,6 +1249,9 @@ function escHtml(s) {
 
 // ── Start / Stop ──────────────────────────────────────
 async function startAll() {
+  // Init FaceMesh on first start
+  if (!faceMesh) initFaceMesh();
+
   const ok = await startCamera();
   if (!ok) return;
 
@@ -1114,10 +1267,6 @@ async function startAll() {
     document.getElementById('stat-time').textContent = formatTime(Date.now() - startTime);
   }, 1000);
 
-  // Initial draw
-  drawOverlay(false);
-
-  // Start capture loop
   captureInterval = setInterval(captureAndAnalyze, intervalMs);
 }
 
@@ -1160,7 +1309,7 @@ document.getElementById('btn-copy-all').addEventListener('click', () => {
 
 document.getElementById('btn-export').addEventListener('click', () => {
   if (!transcripts.length) { showToast('No data to export'); return; }
-  const content = transcripts.map((t, i) =>
+  const content = transcripts.map(t =>
     `[${formatTime(t.time - startTime)}] ${t.text}`
   ).join('\n');
   const blob = new Blob([content], { type: 'text/plain' });
@@ -1177,3 +1326,4 @@ document.getElementById('font-slider').addEventListener('input', e => {
 </script>
 </body>
 </html>
+
