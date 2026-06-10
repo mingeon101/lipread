@@ -3,24 +3,25 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>LipSync — Real-Time Subtitles</title>
+<title>LipRead AI — Microphone-Free Subtitles</title>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=Space+Mono:wght@400;700&display=swap');
 
   :root {
-    --bg: #0a0a0f;
-    --surface: #111118;
-    --surface2: #18181f;
-    --border: #2a2a35;
-    --accent: #7c6aff;
-    --accent2: #a594ff;
-    --text: #e8e8f0;
-    --text-dim: #7a7a90;
-    --text-muted: #44445a;
-    --green: #3dffa0;
+    --bg: #07070d;
+    --surface: #0f0f18;
+    --surface2: #16161f;
+    --surface3: #1e1e2a;
+    --border: #262633;
+    --accent: #6c5ce7;
+    --accent2: #a29bfe;
+    --accent3: #fd79a8;
+    --text: #eeeef5;
+    --text-dim: #7a7a95;
+    --text-muted: #3d3d55;
+    --green: #00cec9;
     --red: #ff4d6d;
     --yellow: #ffd166;
-    --subtitle-bg: rgba(10, 10, 15, 0.88);
   }
 
   * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -32,389 +33,513 @@
     min-height: 100vh;
     display: flex;
     flex-direction: column;
-    overflow-x: hidden;
   }
 
-  /* ── Header ── */
+  /* ── API Key Screen ── */
+  #setup-screen {
+    position: fixed;
+    inset: 0;
+    background: var(--bg);
+    z-index: 100;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+  }
+
+  .setup-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 40px 44px;
+    max-width: 460px;
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+  }
+
+  .setup-logo {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .logo-icon {
+    width: 44px; height: 44px;
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    border-radius: 12px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 22px;
+  }
+
+  .setup-title {
+    font-size: 1.5rem;
+    font-weight: 700;
+    letter-spacing: -0.03em;
+  }
+
+  .setup-sub {
+    font-size: 0.88rem;
+    color: var(--text-dim);
+    line-height: 1.6;
+  }
+
+  .setup-sub a {
+    color: var(--accent2);
+    text-decoration: none;
+  }
+  .setup-sub a:hover { text-decoration: underline; }
+
+  .input-group {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .input-label {
+    font-size: 0.78rem;
+    font-family: 'Space Mono', monospace;
+    color: var(--text-dim);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+
+  .api-input-wrap {
+    position: relative;
+  }
+
+  .api-input {
+    width: 100%;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 12px 48px 12px 16px;
+    font-family: 'Space Mono', monospace;
+    font-size: 0.85rem;
+    color: var(--text);
+    outline: none;
+    transition: border-color 0.2s;
+  }
+  .api-input:focus { border-color: var(--accent); }
+  .api-input::placeholder { color: var(--text-muted); }
+
+  .toggle-vis {
+    position: absolute;
+    right: 14px; top: 50%;
+    transform: translateY(-50%);
+    background: none; border: none;
+    color: var(--text-muted);
+    cursor: pointer;
+    font-size: 16px;
+    transition: color 0.2s;
+  }
+  .toggle-vis:hover { color: var(--text-dim); }
+
+  .setup-hint {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    line-height: 1.5;
+  }
+
+  .btn-setup {
+    padding: 13px;
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    border: none;
+    border-radius: 10px;
+    color: #fff;
+    font-family: 'Space Grotesk', sans-serif;
+    font-weight: 700;
+    font-size: 0.95rem;
+    cursor: pointer;
+    transition: opacity 0.2s, transform 0.15s;
+    letter-spacing: 0.01em;
+  }
+  .btn-setup:hover { opacity: 0.88; transform: translateY(-1px); }
+  .btn-setup:active { transform: translateY(0); }
+
+  /* ── Main App ── */
+  #app-screen { display: none; flex-direction: column; height: 100vh; }
+
   header {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 18px 32px;
+    padding: 14px 28px;
     border-bottom: 1px solid var(--border);
     background: var(--surface);
+    flex-shrink: 0;
   }
 
   .logo {
-    display: flex;
-    align-items: center;
-    gap: 10px;
+    display: flex; align-items: center; gap: 10px;
     font-family: 'Space Mono', monospace;
     font-weight: 700;
-    font-size: 1.15rem;
-    letter-spacing: -0.5px;
+    font-size: 1.05rem;
     color: var(--text);
   }
 
-  .logo-icon {
-    width: 32px; height: 32px;
+  .logo-sm {
+    width: 28px; height: 28px;
     background: linear-gradient(135deg, var(--accent), var(--accent2));
-    border-radius: 8px;
+    border-radius: 7px;
     display: flex; align-items: center; justify-content: center;
-    font-size: 16px;
+    font-size: 14px;
+  }
+
+  .header-right {
+    display: flex;
+    align-items: center;
+    gap: 12px;
   }
 
   .status-pill {
-    display: flex;
-    align-items: center;
-    gap: 7px;
-    font-size: 0.78rem;
+    display: flex; align-items: center; gap: 7px;
+    font-size: 0.75rem;
     font-family: 'Space Mono', monospace;
     color: var(--text-dim);
     background: var(--surface2);
     border: 1px solid var(--border);
     border-radius: 20px;
-    padding: 6px 14px;
+    padding: 5px 13px;
   }
 
   .status-dot {
     width: 7px; height: 7px;
     border-radius: 50%;
     background: var(--text-muted);
-    transition: background 0.3s, box-shadow 0.3s;
+    transition: all 0.3s;
   }
-  .status-dot.listening {
+  .status-dot.active {
     background: var(--green);
     box-shadow: 0 0 8px var(--green);
-    animation: pulse 1.5s infinite;
+    animation: pulse 1.2s infinite;
   }
   .status-dot.error { background: var(--red); }
 
   @keyframes pulse {
     0%, 100% { opacity: 1; }
-    50% { opacity: 0.4; }
+    50% { opacity: 0.3; }
   }
 
-  /* ── Main layout ── */
-  main {
+  .key-badge {
+    font-size: 0.7rem;
+    font-family: 'Space Mono', monospace;
+    color: var(--text-muted);
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 4px 10px;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .key-badge:hover { border-color: var(--accent); color: var(--accent2); }
+
+  /* ── Layout ── */
+  .app-body {
     flex: 1;
     display: grid;
-    grid-template-columns: 1fr 380px;
-    grid-template-rows: 1fr auto;
-    gap: 0;
-    height: calc(100vh - 65px);
+    grid-template-columns: 1fr 360px;
+    overflow: hidden;
   }
 
-  /* ── Camera Section ── */
+  /* ── Camera ── */
   .camera-section {
-    position: relative;
-    background: #05050a;
     display: flex;
     flex-direction: column;
+    background: #04040a;
+    border-right: 1px solid var(--border);
+    position: relative;
+    overflow: hidden;
+  }
+
+  .camera-main {
+    flex: 1;
+    display: flex;
     align-items: center;
     justify-content: center;
-    overflow: hidden;
-    border-right: 1px solid var(--border);
+    position: relative;
   }
 
   .camera-wrap {
     position: relative;
     width: 100%;
-    max-width: 720px;
+    max-width: 700px;
     aspect-ratio: 16/9;
   }
 
   #video {
-    width: 100%;
-    height: 100%;
+    width: 100%; height: 100%;
     object-fit: cover;
-    border-radius: 12px;
+    border-radius: 14px;
     transform: scaleX(-1);
     display: block;
   }
 
   #canvas {
-    position: absolute;
-    top: 0; left: 0;
-    width: 100%;
-    height: 100%;
-    border-radius: 12px;
-    transform: scaleX(-1);
+    position: absolute; top: 0; left: 0;
+    width: 100%; height: 100%;
+    border-radius: 14px;
     pointer-events: none;
+    transform: scaleX(-1);
+  }
+
+  /* Scanning animation */
+  .scan-line {
+    position: absolute;
+    left: 0; right: 0;
+    height: 2px;
+    background: linear-gradient(90deg, transparent, var(--accent), var(--accent2), transparent);
+    opacity: 0;
+    pointer-events: none;
+    border-radius: 14px;
+    transition: opacity 0.3s;
+  }
+  .scan-line.active {
+    opacity: 0.6;
+    animation: scanMove 0.7s ease-in-out;
+  }
+  @keyframes scanMove {
+    0% { top: 30%; }
+    100% { top: 75%; }
   }
 
   /* Subtitle overlay */
   .subtitle-overlay {
     position: absolute;
-    bottom: 20px;
-    left: 50%;
-    transform: translateX(-50%);
-    width: calc(100% - 40px);
-    max-width: 640px;
+    bottom: 16px;
+    left: 50%; transform: translateX(-50%);
+    width: calc(100% - 32px);
     text-align: center;
     z-index: 10;
   }
 
   .subtitle-box {
     display: inline-block;
-    background: var(--subtitle-bg);
-    backdrop-filter: blur(12px);
-    border: 1px solid rgba(124, 106, 255, 0.3);
+    background: rgba(7, 7, 13, 0.85);
+    backdrop-filter: blur(16px);
+    border: 1px solid rgba(108, 92, 231, 0.35);
     border-radius: 10px;
-    padding: 10px 22px;
-    min-height: 46px;
+    padding: 10px 24px;
+    min-height: 44px;
     max-width: 100%;
+    transition: border-color 0.3s;
   }
+  .subtitle-box.fresh { border-color: rgba(108, 92, 231, 0.8); }
 
   #live-subtitle {
-    font-size: 1.25rem;
+    font-size: 1.2rem;
     font-weight: 500;
     color: #fff;
-    line-height: 1.4;
-    letter-spacing: 0.01em;
+    line-height: 1.45;
+    transition: font-size 0.2s;
   }
 
-  #live-subtitle .interim {
-    color: var(--accent2);
-    opacity: 0.85;
-  }
-
-  /* Idle placeholder for camera */
-  .camera-placeholder {
+  /* Placeholder */
+  .cam-placeholder {
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 16px;
+    gap: 14px;
     color: var(--text-muted);
     text-align: center;
+    padding: 32px;
   }
+  .cam-placeholder .icon { font-size: 48px; opacity: 0.3; }
+  .cam-placeholder p { font-size: 0.85rem; line-height: 1.6; max-width: 260px; }
 
-  .camera-placeholder .icon {
-    font-size: 56px;
-    opacity: 0.4;
-  }
-
-  .camera-placeholder p {
-    font-size: 0.9rem;
-    max-width: 280px;
-    line-height: 1.5;
-  }
-
-  /* Lip activity bar */
-  .lip-activity {
-    position: absolute;
-    top: 16px;
-    left: 16px;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    background: rgba(10,10,15,0.75);
-    backdrop-filter: blur(8px);
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    padding: 6px 12px;
-    font-size: 0.72rem;
-    font-family: 'Space Mono', monospace;
-    color: var(--text-dim);
-    opacity: 0;
-    transition: opacity 0.3s;
-  }
-
-  .lip-activity.visible { opacity: 1; }
-
-  .lip-bar-wrap {
-    display: flex;
-    gap: 2px;
-    align-items: flex-end;
-    height: 16px;
-  }
-
-  .lip-bar {
-    width: 3px;
-    background: var(--accent);
-    border-radius: 2px;
-    transition: height 0.08s;
-  }
-
-  /* ── Controls ── */
-  .controls-bar {
-    grid-column: 1 / 2;
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    padding: 16px 24px;
+  /* ── Bottom controls ── */
+  .controls {
+    padding: 14px 20px;
     background: var(--surface);
     border-top: 1px solid var(--border);
-    border-right: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    flex-shrink: 0;
   }
 
   .btn {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    padding: 10px 20px;
-    border: none;
-    border-radius: 8px;
+    display: flex; align-items: center; gap: 7px;
+    padding: 9px 18px;
+    border: none; border-radius: 8px;
     font-family: 'Space Grotesk', sans-serif;
-    font-weight: 600;
-    font-size: 0.88rem;
-    cursor: pointer;
-    transition: all 0.18s;
+    font-weight: 600; font-size: 0.85rem;
+    cursor: pointer; transition: all 0.15s;
   }
-
   .btn-primary {
     background: linear-gradient(135deg, var(--accent), var(--accent2));
     color: #fff;
   }
-  .btn-primary:hover { opacity: 0.88; transform: translateY(-1px); }
-  .btn-primary:active { transform: translateY(0); }
-
-  .btn-secondary {
+  .btn-primary:hover { opacity: 0.85; transform: translateY(-1px); }
+  .btn-stop {
+    background: rgba(255,77,109,0.12);
+    color: var(--red);
+    border: 1px solid rgba(255,77,109,0.25);
+  }
+  .btn-stop:hover { background: rgba(255,77,109,0.2); }
+  .btn-ghost {
     background: var(--surface2);
     color: var(--text-dim);
     border: 1px solid var(--border);
   }
-  .btn-secondary:hover { border-color: var(--accent); color: var(--text); }
+  .btn-ghost:hover { border-color: var(--accent); color: var(--text); }
+  .btn:disabled { opacity: 0.3; cursor: not-allowed; transform: none !important; }
 
-  .btn-danger {
-    background: rgba(255, 77, 109, 0.12);
-    color: var(--red);
-    border: 1px solid rgba(255, 77, 109, 0.25);
-  }
-  .btn-danger:hover { background: rgba(255, 77, 109, 0.2); }
-
-  .btn:disabled { opacity: 0.35; cursor: not-allowed; transform: none; }
-
-  /* Language select */
-  select {
-    background: var(--surface2);
-    color: var(--text);
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    padding: 9px 14px;
-    font-family: 'Space Grotesk', sans-serif;
-    font-size: 0.85rem;
-    cursor: pointer;
-    outline: none;
-    transition: border-color 0.2s;
-  }
-  select:hover { border-color: var(--accent); }
-
-  .spacer { flex: 1; }
-
-  /* Font size slider */
-  .font-control {
+  /* Interval selector */
+  .interval-group {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 6px;
     font-size: 0.78rem;
     color: var(--text-dim);
   }
 
+  .interval-btns { display: flex; gap: 4px; }
+
+  .ivbtn {
+    padding: 5px 10px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    font-family: 'Space Mono', monospace;
+    font-size: 0.72rem;
+    color: var(--text-dim);
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .ivbtn:hover { border-color: var(--accent); }
+  .ivbtn.active {
+    background: rgba(108,92,231,0.2);
+    border-color: var(--accent);
+    color: var(--accent2);
+  }
+
+  .spacer { flex: 1; }
+
+  /* Font size */
+  .font-control {
+    display: flex; align-items: center; gap: 6px;
+    font-size: 0.75rem; color: var(--text-dim);
+  }
   input[type=range] {
     -webkit-appearance: none;
-    width: 80px;
-    height: 4px;
-    background: var(--border);
-    border-radius: 2px;
-    outline: none;
+    width: 70px; height: 3px;
+    background: var(--border); border-radius: 2px; outline: none;
   }
   input[type=range]::-webkit-slider-thumb {
     -webkit-appearance: none;
-    width: 14px; height: 14px;
-    border-radius: 50%;
-    background: var(--accent);
-    cursor: pointer;
+    width: 13px; height: 13px;
+    border-radius: 50%; background: var(--accent); cursor: pointer;
   }
 
   /* ── Side Panel ── */
   .side-panel {
-    grid-row: 1 / 3;
     background: var(--surface);
     display: flex;
     flex-direction: column;
     overflow: hidden;
   }
 
-  .panel-header {
-    padding: 20px 22px 14px;
+  .panel-head {
+    padding: 18px 20px 12px;
     border-bottom: 1px solid var(--border);
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
+    display: flex; align-items: center; justify-content: space-between;
+    flex-shrink: 0;
   }
 
   .panel-title {
-    font-size: 0.8rem;
+    font-size: 0.72rem;
     font-family: 'Space Mono', monospace;
     color: var(--text-dim);
-    letter-spacing: 0.08em;
     text-transform: uppercase;
+    letter-spacing: 0.08em;
   }
 
-  .clear-btn {
-    background: none;
-    border: none;
-    color: var(--text-muted);
-    cursor: pointer;
-    font-size: 0.75rem;
-    font-family: 'Space Grotesk', sans-serif;
-    transition: color 0.2s;
-    padding: 2px 6px;
-  }
-  .clear-btn:hover { color: var(--red); }
+  .panel-actions { display: flex; gap: 6px; }
 
-  /* Transcript log */
-  #transcript-log {
+  .icon-btn {
+    background: none; border: none;
+    color: var(--text-muted); cursor: pointer;
+    font-size: 0.72rem;
+    font-family: 'Space Mono', monospace;
+    padding: 3px 8px;
+    border-radius: 5px;
+    transition: all 0.2s;
+    border: 1px solid transparent;
+  }
+  .icon-btn:hover { border-color: var(--border); color: var(--text-dim); }
+  .icon-btn.danger:hover { border-color: rgba(255,77,109,0.3); color: var(--red); }
+
+  /* Log */
+  #log {
     flex: 1;
     overflow-y: auto;
-    padding: 16px 22px;
+    padding: 14px 18px;
     display: flex;
     flex-direction: column;
-    gap: 10px;
-    scroll-behavior: smooth;
+    gap: 8px;
   }
+  #log::-webkit-scrollbar { width: 3px; }
+  #log::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
 
-  #transcript-log::-webkit-scrollbar { width: 4px; }
-  #transcript-log::-webkit-scrollbar-track { background: transparent; }
-  #transcript-log::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
-
-  .transcript-item {
+  .log-item {
     background: var(--surface2);
     border: 1px solid var(--border);
     border-radius: 10px;
-    padding: 10px 14px;
-    font-size: 0.9rem;
-    line-height: 1.5;
-    color: var(--text);
-    animation: slideIn 0.25s ease;
-    position: relative;
+    padding: 10px 13px;
     cursor: pointer;
     transition: border-color 0.2s;
+    position: relative;
+    animation: fadeUp 0.22s ease;
   }
-  .transcript-item:hover { border-color: var(--accent); }
-  .transcript-item:hover::after {
-    content: '복사';
-    position: absolute;
-    top: 8px; right: 10px;
-    font-size: 0.65rem;
-    color: var(--accent2);
-    font-family: 'Space Mono', monospace;
-  }
+  .log-item:hover { border-color: var(--accent); }
+  .log-item:hover .copy-hint { opacity: 1; }
 
-  @keyframes slideIn {
-    from { opacity: 0; transform: translateY(8px); }
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(6px); }
     to { opacity: 1; transform: translateY(0); }
   }
 
-  .ts-time {
-    font-size: 0.65rem;
+  .log-time {
+    font-size: 0.62rem;
     font-family: 'Space Mono', monospace;
     color: var(--text-muted);
     margin-bottom: 4px;
   }
 
-  .empty-state {
+  .log-text {
+    font-size: 0.88rem;
+    line-height: 1.5;
+    color: var(--text);
+  }
+
+  .copy-hint {
+    position: absolute;
+    top: 8px; right: 10px;
+    font-size: 0.6rem;
+    color: var(--accent2);
+    font-family: 'Space Mono', monospace;
+    opacity: 0;
+    transition: opacity 0.2s;
+  }
+
+  /* confidence indicator */
+  .conf-bar {
+    margin-top: 6px;
+    height: 2px;
+    background: var(--border);
+    border-radius: 1px;
+    overflow: hidden;
+  }
+  .conf-fill {
+    height: 100%;
+    border-radius: 1px;
+    transition: width 0.3s;
+  }
+
+  .empty-log {
     flex: 1;
     display: flex;
     flex-direction: column;
@@ -425,230 +550,317 @@
     text-align: center;
     padding: 24px;
   }
+  .empty-log .e-icon { font-size: 28px; opacity: 0.3; }
+  .empty-log p { font-size: 0.8rem; line-height: 1.5; }
 
-  .empty-state .icon { font-size: 32px; opacity: 0.4; }
-  .empty-state p { font-size: 0.82rem; line-height: 1.5; }
-
-  /* Stats bar */
-  .stats-bar {
-    padding: 14px 22px;
+  /* Stats */
+  .stats {
+    padding: 12px 20px;
     border-top: 1px solid var(--border);
     display: grid;
-    grid-template-columns: 1fr 1fr 1fr;
-    gap: 8px;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 6px;
+    flex-shrink: 0;
   }
 
-  .stat {
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-  }
-
+  .stat { display: flex; flex-direction: column; gap: 2px; }
   .stat-val {
     font-family: 'Space Mono', monospace;
-    font-size: 1rem;
+    font-size: 0.95rem;
     font-weight: 700;
     color: var(--text);
   }
-
   .stat-label {
-    font-size: 0.65rem;
+    font-size: 0.6rem;
     color: var(--text-muted);
     text-transform: uppercase;
-    letter-spacing: 0.06em;
+    letter-spacing: 0.05em;
   }
 
   /* Toast */
   .toast {
     position: fixed;
-    bottom: 24px; left: 50%;
-    transform: translateX(-50%) translateY(60px);
+    bottom: 22px; left: 50%;
+    transform: translateX(-50%) translateY(50px);
     background: var(--surface2);
     border: 1px solid var(--border);
     border-radius: 8px;
-    padding: 10px 20px;
-    font-size: 0.82rem;
+    padding: 9px 18px;
+    font-size: 0.8rem;
+    font-family: 'Space Mono', monospace;
     color: var(--text);
     z-index: 999;
-    transition: transform 0.3s ease;
-    font-family: 'Space Mono', monospace;
+    transition: transform 0.28s ease;
+    white-space: nowrap;
   }
   .toast.show { transform: translateX(-50%) translateY(0); }
 
-  /* Warning banner */
-  .warning-banner {
+  /* Processing overlay */
+  .processing-badge {
+    position: absolute;
+    top: 14px; right: 14px;
+    background: rgba(7,7,13,0.8);
+    backdrop-filter: blur(8px);
+    border: 1px solid rgba(108,92,231,0.4);
+    border-radius: 8px;
+    padding: 6px 12px;
+    font-size: 0.7rem;
+    font-family: 'Space Mono', monospace;
+    color: var(--accent2);
     display: none;
     align-items: center;
-    gap: 10px;
-    background: rgba(255, 209, 102, 0.08);
-    border: 1px solid rgba(255, 209, 102, 0.2);
-    border-radius: 8px;
-    padding: 10px 16px;
-    font-size: 0.8rem;
-    color: var(--yellow);
-    margin: 12px 24px;
+    gap: 6px;
   }
+  .processing-badge.show { display: flex; }
 
-  .warning-banner.show { display: flex; }
+  .spin {
+    width: 10px; height: 10px;
+    border: 2px solid rgba(162,155,254,0.3);
+    border-top-color: var(--accent2);
+    border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
 
-  /* Mobile */
-  @media (max-width: 800px) {
-    main {
-      grid-template-columns: 1fr;
-      grid-template-rows: 1fr auto auto;
-    }
-    .side-panel {
-      grid-row: auto;
-      max-height: 260px;
-    }
-    .controls-bar {
-      grid-column: 1;
-      flex-wrap: wrap;
-    }
+  /* Latency indicator */
+  .latency-badge {
+    position: absolute;
+    top: 14px; left: 14px;
+    background: rgba(7,7,13,0.75);
+    backdrop-filter: blur(8px);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 6px 12px;
+    font-size: 0.68rem;
+    font-family: 'Space Mono', monospace;
+    color: var(--text-muted);
+    display: none;
+  }
+  .latency-badge.show { display: block; }
+
+  @media (max-width: 760px) {
+    .app-body { grid-template-columns: 1fr; grid-template-rows: 1fr auto; }
+    .side-panel { max-height: 220px; }
   }
 </style>
 </head>
 <body>
 
-<header>
-  <div class="logo">
-    <div class="logo-icon">👄</div>
-    LipSync
-  </div>
-  <div class="status-pill">
-    <div class="status-dot" id="status-dot"></div>
-    <span id="status-text">Ready</span>
-  </div>
-</header>
-
-<main>
-  <!-- Camera -->
-  <div class="camera-section" id="camera-section">
-    <div class="camera-wrap" id="camera-wrap" style="display:none">
-      <video id="video" autoplay muted playsinline></video>
-      <canvas id="canvas"></canvas>
-      <div class="lip-activity" id="lip-activity">
-        <span>LIPS</span>
-        <div class="lip-bar-wrap" id="lip-bars"></div>
+<!-- ── API Key Setup Screen ── -->
+<div id="setup-screen">
+  <div class="setup-card">
+    <div class="setup-logo">
+      <div class="logo-icon">👄</div>
+      <div>
+        <div class="setup-title">LipRead AI</div>
       </div>
-      <div class="subtitle-overlay">
-        <div class="subtitle-box">
-          <div id="live-subtitle">—</div>
+    </div>
+
+    <p class="setup-sub">
+      카메라 영상만으로 실시간 립리딩 자막을 생성합니다.<br>
+      마이크 불필요 — Gemini Vision API 사용.<br><br>
+      API 키는 <a href="https://aistudio.google.com/app/apikey" target="_blank">Google AI Studio</a>에서 무료로 발급받을 수 있습니다.
+    </p>
+
+    <div class="input-group">
+      <div class="input-label">Gemini API Key</div>
+      <div class="api-input-wrap">
+        <input class="api-input" id="api-key-input" type="password"
+          placeholder="AIza..." autocomplete="off" spellcheck="false">
+        <button class="toggle-vis" id="toggle-vis" title="Show/hide key">👁</button>
+      </div>
+      <div class="setup-hint">키는 브라우저 로컬에만 저장되며 외부로 전송되지 않습니다.</div>
+    </div>
+
+    <button class="btn-setup" id="btn-confirm-key">시작하기 →</button>
+  </div>
+</div>
+
+<!-- ── Main App ── -->
+<div id="app-screen">
+  <header>
+    <div class="logo">
+      <div class="logo-sm">👄</div>
+      LipRead AI
+    </div>
+    <div class="header-right">
+      <div class="status-pill">
+        <div class="status-dot" id="status-dot"></div>
+        <span id="status-text">Ready</span>
+      </div>
+      <div class="key-badge" id="key-badge" title="Click to change API key">●●●●●●●</div>
+    </div>
+  </header>
+
+  <div class="app-body">
+    <!-- Camera -->
+    <div class="camera-section">
+      <div class="camera-main" id="camera-main">
+        <div class="cam-placeholder" id="cam-placeholder">
+          <div class="icon">📷</div>
+          <p>Start 버튼을 눌러<br>카메라를 활성화하고<br>립리딩을 시작하세요.</p>
+        </div>
+
+        <div class="camera-wrap" id="camera-wrap" style="display:none">
+          <video id="video" autoplay muted playsinline></video>
+          <canvas id="canvas"></canvas>
+          <div class="scan-line" id="scan-line"></div>
+
+          <div class="latency-badge" id="latency-badge"></div>
+
+          <div class="processing-badge" id="proc-badge">
+            <div class="spin"></div>
+            Analyzing…
+          </div>
+
+          <div class="subtitle-overlay">
+            <div class="subtitle-box" id="subtitle-box">
+              <div id="live-subtitle">—</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="controls">
+        <button class="btn btn-primary" id="btn-start">▶ Start</button>
+        <button class="btn btn-stop" id="btn-stop" disabled>⏹ Stop</button>
+
+        <div class="interval-group">
+          <span>Interval</span>
+          <div class="interval-btns">
+            <button class="ivbtn" data-ms="800">0.8s</button>
+            <button class="ivbtn active" data-ms="1500">1.5s</button>
+            <button class="ivbtn" data-ms="2500">2.5s</button>
+            <button class="ivbtn" data-ms="4000">4s</button>
+          </div>
+        </div>
+
+        <div class="spacer"></div>
+
+        <div class="font-control">
+          <span style="font-size:12px">A</span>
+          <input type="range" id="font-slider" min="14" max="30" value="19">
+          <span style="font-size:18px">A</span>
+        </div>
+
+        <button class="btn btn-ghost" id="btn-copy-all">📋 Copy</button>
+      </div>
+    </div>
+
+    <!-- Side Panel -->
+    <div class="side-panel">
+      <div class="panel-head">
+        <span class="panel-title">Transcript</span>
+        <div class="panel-actions">
+          <button class="icon-btn" id="btn-export">Export</button>
+          <button class="icon-btn danger" id="btn-clear">Clear</button>
+        </div>
+      </div>
+
+      <div id="log">
+        <div class="empty-log" id="empty-log">
+          <div class="e-icon">💬</div>
+          <p>립리딩으로 인식된 텍스트가<br>여기에 표시됩니다.</p>
+        </div>
+      </div>
+
+      <div class="stats">
+        <div class="stat">
+          <div class="stat-val" id="stat-words">0</div>
+          <div class="stat-label">Words</div>
+        </div>
+        <div class="stat">
+          <div class="stat-val" id="stat-lines">0</div>
+          <div class="stat-label">Lines</div>
+        </div>
+        <div class="stat">
+          <div class="stat-val" id="stat-api">0</div>
+          <div class="stat-label">API calls</div>
+        </div>
+        <div class="stat">
+          <div class="stat-val" id="stat-time">0:00</div>
+          <div class="stat-label">Time</div>
         </div>
       </div>
     </div>
-
-    <div class="camera-placeholder" id="cam-placeholder">
-      <div class="icon">📷</div>
-      <p>Press <strong>Start</strong> to activate camera and begin real-time subtitle generation.</p>
-    </div>
-
-    <div class="warning-banner" id="warn-banner">
-      ⚠️ Speech Recognition requires Chrome or Edge. Safari is not supported.
-    </div>
   </div>
-
-  <!-- Controls -->
-  <div class="controls-bar">
-    <button class="btn btn-primary" id="btn-start">▶ Start</button>
-    <button class="btn btn-danger" id="btn-stop" disabled>⏹ Stop</button>
-    <select id="lang-select">
-      <option value="en-US">English (US)</option>
-      <option value="en-GB">English (UK)</option>
-      <option value="en-AU">English (AU)</option>
-    </select>
-    <div class="font-control">
-      <span>Aa</span>
-      <input type="range" id="font-slider" min="14" max="32" value="20">
-      <span>Aa</span>
-    </div>
-    <div class="spacer"></div>
-    <button class="btn btn-secondary" id="btn-copy-all">📋 Copy All</button>
-  </div>
-
-  <!-- Side panel -->
-  <div class="side-panel">
-    <div class="panel-header">
-      <span class="panel-title">Transcript</span>
-      <button class="clear-btn" id="btn-clear">Clear</button>
-    </div>
-
-    <div id="transcript-log">
-      <div class="empty-state" id="empty-state">
-        <div class="icon">📝</div>
-        <p>Recognized speech will appear here as you speak.</p>
-      </div>
-    </div>
-
-    <div class="stats-bar">
-      <div class="stat">
-        <div class="stat-val" id="stat-words">0</div>
-        <div class="stat-label">Words</div>
-      </div>
-      <div class="stat">
-        <div class="stat-val" id="stat-lines">0</div>
-        <div class="stat-label">Lines</div>
-      </div>
-      <div class="stat">
-        <div class="stat-val" id="stat-time">0:00</div>
-        <div class="stat-label">Duration</div>
-      </div>
-    </div>
-  </div>
-</main>
+</div>
 
 <div class="toast" id="toast"></div>
 
 <script>
-// ── State ──────────────────────────────────────────────
-let recognition = null;
+// ── State ─────────────────────────────────────────────
+let apiKey = '';
 let stream = null;
 let isRunning = false;
+let captureInterval = null;
+let timerInterval = null;
+let intervalMs = 1500;
+let startTime = null;
 let transcripts = [];
 let wordCount = 0;
-let startTime = null;
-let timerInterval = null;
-let lipAnimInterval = null;
-let lastInterim = '';
+let apiCalls = 0;
+let isAnalyzing = false;
+let lastText = '';
 
-// ── Elements ──────────────────────────────────────────
+// ── Elements ─────────────────────────────────────────
 const video = document.getElementById('video');
 const canvas = document.getElementById('canvas');
 const ctx = canvas.getContext('2d');
 const liveSubtitle = document.getElementById('live-subtitle');
+const subtitleBox = document.getElementById('subtitle-box');
 const statusDot = document.getElementById('status-dot');
 const statusText = document.getElementById('status-text');
-const transcriptLog = document.getElementById('transcript-log');
-const emptyState = document.getElementById('empty-state');
-const camPlaceholder = document.getElementById('cam-placeholder');
-const cameraWrap = document.getElementById('camera-wrap');
-const lipActivity = document.getElementById('lip-activity');
-const lipBars = document.getElementById('lip-bars');
-const warnBanner = document.getElementById('warn-banner');
+const logEl = document.getElementById('log');
+const scanLine = document.getElementById('scan-line');
+const procBadge = document.getElementById('proc-badge');
+const latencyBadge = document.getElementById('latency-badge');
 
-// ── Check browser support ──────────────────────────────
-const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-if (!SpeechRecognition) {
-  warnBanner.classList.add('show');
+// ── Setup Screen ──────────────────────────────────────
+document.getElementById('toggle-vis').addEventListener('click', () => {
+  const inp = document.getElementById('api-key-input');
+  inp.type = inp.type === 'password' ? 'text' : 'password';
+});
+
+document.getElementById('api-key-input').addEventListener('keydown', e => {
+  if (e.key === 'Enter') confirmKey();
+});
+
+document.getElementById('btn-confirm-key').addEventListener('click', confirmKey);
+
+function confirmKey() {
+  const val = document.getElementById('api-key-input').value.trim();
+  if (!val || !val.startsWith('AIza')) {
+    showToast('⚠️ 유효한 API 키를 입력해주세요');
+    return;
+  }
+  apiKey = val;
+  document.getElementById('setup-screen').style.display = 'none';
+  document.getElementById('app-screen').style.display = 'flex';
 }
 
-// ── Init lip bars ──────────────────────────────────────
-for (let i = 0; i < 8; i++) {
-  const bar = document.createElement('div');
-  bar.className = 'lip-bar';
-  bar.style.height = '3px';
-  lipBars.appendChild(bar);
-}
+document.getElementById('key-badge').addEventListener('click', () => {
+  stopAll();
+  apiKey = '';
+  document.getElementById('api-key-input').value = '';
+  document.getElementById('setup-screen').style.display = 'flex';
+  document.getElementById('app-screen').style.display = 'none';
+});
 
-function animateLipBars(active) {
-  const bars = lipBars.querySelectorAll('.lip-bar');
-  bars.forEach(bar => {
-    const h = active ? (3 + Math.random() * 13) : 3;
-    bar.style.height = h + 'px';
+// ── Interval buttons ──────────────────────────────────
+document.querySelectorAll('.ivbtn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.ivbtn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    intervalMs = parseInt(btn.dataset.ms);
+    if (isRunning) {
+      clearInterval(captureInterval);
+      captureInterval = setInterval(captureAndAnalyze, intervalMs);
+    }
   });
-}
+});
 
-// ── Camera ─────────────────────────────────────────────
+// ── Camera ────────────────────────────────────────────
 async function startCamera() {
   try {
     stream = await navigator.mediaDevices.getUserMedia({
@@ -656,263 +868,224 @@ async function startCamera() {
       audio: false
     });
     video.srcObject = stream;
-    await new Promise(r => video.onloadedmetadata = r);
-    cameraWrap.style.display = 'block';
-    camPlaceholder.style.display = 'none';
-
-    // Set canvas size
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
-
-    // Start face tracking
-    startFaceTracking();
+    await new Promise(r => { video.onloadedmetadata = r; });
+    document.getElementById('camera-wrap').style.display = 'block';
+    document.getElementById('cam-placeholder').style.display = 'none';
+    canvas.width = video.videoWidth || 640;
+    canvas.height = video.videoHeight || 480;
     return true;
-  } catch (err) {
-    showToast('📷 Camera access denied');
+  } catch (e) {
+    showToast('📷 카메라 접근이 거부됐습니다');
     return false;
   }
 }
 
 function stopCamera() {
-  if (stream) {
-    stream.getTracks().forEach(t => t.stop());
-    stream = null;
-  }
-  cameraWrap.style.display = 'none';
-  camPlaceholder.style.display = 'flex';
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  if (stream) { stream.getTracks().forEach(t => t.stop()); stream = null; }
+  document.getElementById('camera-wrap').style.display = 'none';
+  document.getElementById('cam-placeholder').style.display = 'flex';
 }
 
-// ── Face / Lip Tracking (Canvas overlay) ─────────────
-let faceTrackInterval = null;
-let lipOpen = false;
-
-function startFaceTracking() {
-  lipActivity.classList.add('visible');
-
-  // Simulate lip detection with subtle canvas overlay
-  faceTrackInterval = setInterval(() => {
-    if (!isRunning) return;
-    drawLipOverlay();
-  }, 100);
+// ── Capture & Analyze ─────────────────────────────────
+function captureFrame() {
+  // Draw current video frame to offscreen canvas
+  const offscreen = document.createElement('canvas');
+  offscreen.width = 480;
+  offscreen.height = 270;
+  const oc = offscreen.getContext('2d');
+  // Mirror-correct for capture (video CSS is mirrored, but capture is raw)
+  oc.scale(-1, 1);
+  oc.drawImage(video, -480, 0, 480, 270);
+  return offscreen.toDataURL('image/jpeg', 0.75).split(',')[1];
 }
 
-function drawLipOverlay() {
-  if (!video.videoWidth) return;
+async function captureAndAnalyze() {
+  if (isAnalyzing || !isRunning) return;
+  isAnalyzing = true;
 
-  canvas.width = video.videoWidth;
-  canvas.height = video.videoHeight;
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  // Visual feedback
+  procBadge.classList.add('show');
+  triggerScan();
+  drawOverlay(true);
 
-  // Draw center face guide
-  const cx = canvas.width / 2;
-  const cy = canvas.height * 0.48;
-  const rw = canvas.width * 0.22;
-  const rh = canvas.height * 0.3;
-
-  // Face oval
-  ctx.beginPath();
-  ctx.ellipse(cx, cy, rw, rh, 0, 0, Math.PI * 2);
-  ctx.strokeStyle = lipOpen
-    ? 'rgba(124, 106, 255, 0.55)'
-    : 'rgba(124, 106, 255, 0.2)';
-  ctx.lineWidth = 1.5;
-  ctx.stroke();
-
-  // Lip region
-  const ly = cy + rh * 0.45;
-  const lw = rw * 0.52;
-  ctx.beginPath();
-  ctx.ellipse(cx, ly, lw, lw * 0.35, 0, 0, Math.PI * 2);
-  ctx.strokeStyle = lipOpen
-    ? 'rgba(61, 255, 160, 0.7)'
-    : 'rgba(61, 255, 160, 0.25)';
-  ctx.lineWidth = 1.5;
-  ctx.stroke();
-
-  // Corner dots
-  const corners = [
-    [cx - lw, ly],
-    [cx + lw, ly],
-    [cx, ly - lw * 0.35],
-    [cx, ly + lw * 0.35],
-  ];
-  corners.forEach(([x, y]) => {
-    ctx.beginPath();
-    ctx.arc(x, y, 3, 0, Math.PI * 2);
-    ctx.fillStyle = lipOpen ? 'rgba(61,255,160,0.9)' : 'rgba(61,255,160,0.35)';
-    ctx.fill();
-  });
-}
-
-// ── Speech Recognition ────────────────────────────────
-function setupRecognition() {
-  if (!SpeechRecognition) return null;
-
-  const lang = document.getElementById('lang-select').value;
-  const rec = new SpeechRecognition();
-  rec.lang = lang;
-  rec.continuous = true;
-  rec.interimResults = true;
-  rec.maxAlternatives = 1;
-
-  rec.onstart = () => {
-    setStatus('listening', 'Listening…');
-    lipOpen = true;
-  };
-
-  rec.onresult = (e) => {
-    let interimText = '';
-    let finalText = '';
-
-    for (let i = e.resultIndex; i < e.results.length; i++) {
-      const text = e.results[i][0].transcript;
-      if (e.results[i].isFinal) {
-        finalText += text.trim() + ' ';
-      } else {
-        interimText += text;
-      }
-    }
-
-    // Animate lip bars
-    lipOpen = true;
-    animateLipBars(true);
-
-    // Show live subtitle
-    if (finalText) {
-      liveSubtitle.textContent = finalText.trim();
-      addTranscript(finalText.trim());
-      setTimeout(() => {
-        if (liveSubtitle.textContent === finalText.trim()) {
-          liveSubtitle.textContent = '—';
-        }
-      }, 3000);
-    } else if (interimText) {
-      liveSubtitle.innerHTML = `<span class="interim">${interimText}</span>`;
-    }
-  };
-
-  rec.onspeechend = () => {
-    lipOpen = false;
-    animateLipBars(false);
-  };
-
-  rec.onerror = (e) => {
-    if (e.error === 'no-speech') return;
-    if (e.error === 'not-allowed') {
-      setStatus('error', 'Mic denied');
-      showToast('🎤 Microphone access denied');
-      stopAll();
-    }
-  };
-
-  rec.onend = () => {
-    if (isRunning) {
-      // Restart automatically
-      try { rec.start(); } catch(err) {}
-    } else {
-      setStatus('idle', 'Ready');
-      lipOpen = false;
-      animateLipBars(false);
-    }
-  };
-
-  return rec;
-}
-
-// ── Start / Stop ───────────────────────────────────────
-async function startAll() {
-  const camOk = await startCamera();
-  if (!camOk) return;
-
-  recognition = setupRecognition();
-  if (!recognition) {
-    showToast('❌ Speech Recognition not supported');
-    stopCamera();
-    return;
-  }
+  const t0 = Date.now();
 
   try {
-    recognition.start();
-    isRunning = true;
-    document.getElementById('btn-start').disabled = true;
-    document.getElementById('btn-stop').disabled = false;
+    const frameB64 = captureFrame();
+    const result = await callGemini(frameB64);
+    const latency = Date.now() - t0;
 
-    startTime = Date.now();
-    timerInterval = setInterval(updateTimer, 1000);
+    latencyBadge.classList.add('show');
+    latencyBadge.textContent = `${latency}ms`;
 
-    // Lip bar animation
-    lipAnimInterval = setInterval(() => {
-      if (!lipOpen) animateLipBars(false);
-    }, 150);
+    if (result && result.trim() && result !== '[silence]' && result !== lastText) {
+      lastText = result;
+      showSubtitle(result);
+      addLog(result, latency);
+    } else if (!result || result === '[silence]') {
+      // Mouth closed / no speech — keep last subtitle briefly
+    }
+    apiCalls++;
+    document.getElementById('stat-api').textContent = apiCalls;
+
   } catch (err) {
-    showToast('❌ Could not start recognition');
+    if (err.message.includes('API_KEY') || err.message.includes('401')) {
+      showToast('❌ API 키가 잘못됐습니다');
+      stopAll();
+    } else {
+      console.error('Gemini error:', err.message);
+    }
   }
+
+  procBadge.classList.remove('show');
+  drawOverlay(false);
+  isAnalyzing = false;
 }
 
-function stopAll() {
-  isRunning = false;
-  lipOpen = false;
+// ── Gemini API Call ───────────────────────────────────
+async function callGemini(imageB64) {
+  const prompt = `You are an expert lip reader. Look at this image of a person's face.
 
-  if (recognition) {
-    recognition.stop();
-    recognition = null;
+Your task: Read what the person is CURRENTLY saying by analyzing their lip and mouth position.
+
+Rules:
+- Output ONLY the spoken English words you can read from the lips
+- If the mouth appears closed or the person is not speaking, output exactly: [silence]
+- If you can partially read lips, output what you can
+- Do NOT describe the image
+- Do NOT add explanations, punctuation notes, or labels
+- Keep output to 1-10 words maximum
+- Output in plain text only`;
+
+  const res = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{
+          parts: [
+            { inline_data: { mime_type: 'image/jpeg', data: imageB64 } },
+            { text: prompt }
+          ]
+        }],
+        generationConfig: {
+          temperature: 0.1,
+          maxOutputTokens: 60,
+          candidateCount: 1
+        }
+      })
+    }
+  );
+
+  if (!res.ok) {
+    const err = await res.json();
+    throw new Error(err.error?.message || `HTTP ${res.status}`);
   }
-  if (faceTrackInterval) clearInterval(faceTrackInterval);
-  if (lipAnimInterval) clearInterval(lipAnimInterval);
-  if (timerInterval) clearInterval(timerInterval);
 
-  stopCamera();
-  animateLipBars(false);
-  lipActivity.classList.remove('visible');
-  liveSubtitle.textContent = '—';
-  setStatus('idle', 'Ready');
-
-  document.getElementById('btn-start').disabled = false;
-  document.getElementById('btn-stop').disabled = true;
+  const data = await res.json();
+  return data.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || '';
 }
 
-// ── Transcript ─────────────────────────────────────────
-function addTranscript(text) {
-  if (!text) return;
+// ── UI helpers ────────────────────────────────────────
+function showSubtitle(text) {
+  liveSubtitle.textContent = text;
+  subtitleBox.classList.add('fresh');
+  setTimeout(() => subtitleBox.classList.remove('fresh'), 600);
+
+  // Auto-fade after 4s
+  clearTimeout(showSubtitle._timer);
+  showSubtitle._timer = setTimeout(() => {
+    if (liveSubtitle.textContent === text) liveSubtitle.textContent = '—';
+  }, 4000);
+}
+
+function addLog(text, latencyMs) {
+  document.getElementById('empty-log')?.remove();
 
   transcripts.push({ text, time: new Date() });
   wordCount += text.split(/\s+/).filter(Boolean).length;
 
-  // Remove empty state
-  emptyState.remove();
-
   const item = document.createElement('div');
-  item.className = 'transcript-item';
+  item.className = 'log-item';
 
-  const ts = document.createElement('div');
-  ts.className = 'ts-time';
   const elapsed = startTime ? formatTime(Date.now() - startTime) : '0:00';
-  ts.textContent = elapsed;
+  const conf = Math.min(100, Math.max(30, 100 - (latencyMs - 500) / 30));
+  const confColor = conf > 70 ? '#00cec9' : conf > 45 ? '#ffd166' : '#ff4d6d';
 
-  const txt = document.createElement('div');
-  txt.textContent = text;
-
-  item.appendChild(ts);
-  item.appendChild(txt);
+  item.innerHTML = `
+    <div class="copy-hint">copy</div>
+    <div class="log-time">${elapsed} · ${latencyMs}ms</div>
+    <div class="log-text">${escHtml(text)}</div>
+    <div class="conf-bar"><div class="conf-fill" style="width:${conf}%;background:${confColor}"></div></div>
+  `;
   item.addEventListener('click', () => {
     navigator.clipboard.writeText(text).then(() => showToast('✅ Copied'));
   });
 
-  transcriptLog.appendChild(item);
-  transcriptLog.scrollTop = transcriptLog.scrollHeight;
+  logEl.appendChild(item);
+  logEl.scrollTop = logEl.scrollHeight;
 
-  updateStats();
-}
-
-function updateStats() {
   document.getElementById('stat-words').textContent = wordCount;
   document.getElementById('stat-lines').textContent = transcripts.length;
 }
 
-function updateTimer() {
-  if (!startTime) return;
-  document.getElementById('stat-time').textContent = formatTime(Date.now() - startTime);
+function drawOverlay(analyzing) {
+  if (!video.videoWidth) return;
+  canvas.width = video.videoWidth;
+  canvas.height = video.videoHeight;
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  const cx = canvas.width / 2;
+  const cy = canvas.height * 0.47;
+  const rw = canvas.width * 0.2;
+  const rh = canvas.height * 0.28;
+
+  // Face oval
+  ctx.beginPath();
+  ctx.ellipse(cx, cy, rw, rh, 0, 0, Math.PI * 2);
+  ctx.strokeStyle = analyzing ? 'rgba(108,92,231,0.6)' : 'rgba(108,92,231,0.18)';
+  ctx.lineWidth = 1.5;
+  ctx.setLineDash(analyzing ? [] : [6, 4]);
+  ctx.stroke();
+  ctx.setLineDash([]);
+
+  // Lip ellipse
+  const ly = cy + rh * 0.44;
+  const lw = rw * 0.48;
+  const lh = lw * 0.3;
+  ctx.beginPath();
+  ctx.ellipse(cx, ly, lw, lh, 0, 0, Math.PI * 2);
+  ctx.strokeStyle = analyzing ? 'rgba(0,206,201,0.8)' : 'rgba(0,206,201,0.25)';
+  ctx.lineWidth = 1.8;
+  ctx.stroke();
+
+  // Corner markers
+  [[cx - lw, ly], [cx + lw, ly], [cx, ly - lh], [cx, ly + lh]].forEach(([x, y]) => {
+    ctx.beginPath();
+    ctx.arc(x, y, 3.5, 0, Math.PI * 2);
+    ctx.fillStyle = analyzing ? 'rgba(0,206,201,0.9)' : 'rgba(0,206,201,0.3)';
+    ctx.fill();
+  });
+}
+
+function triggerScan() {
+  scanLine.classList.remove('active');
+  void scanLine.offsetWidth;
+  scanLine.classList.add('active');
+}
+
+function setStatus(state, label) {
+  statusText.textContent = label;
+  statusDot.className = 'status-dot' + (state === 'active' ? ' active' : state === 'error' ? ' error' : '');
+}
+
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(showToast._t);
+  showToast._t = setTimeout(() => t.classList.remove('show'), 2800);
 }
 
 function formatTime(ms) {
@@ -920,33 +1093,63 @@ function formatTime(ms) {
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
 }
 
-// ── UI Helpers ─────────────────────────────────────────
-function setStatus(state, label) {
-  statusText.textContent = label;
-  statusDot.className = 'status-dot ' + (state === 'listening' ? 'listening' : state === 'error' ? 'error' : '');
+function escHtml(s) {
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 }
 
-function showToast(msg) {
-  const t = document.getElementById('toast');
-  t.textContent = msg;
-  t.classList.add('show');
-  setTimeout(() => t.classList.remove('show'), 2800);
+// ── Start / Stop ──────────────────────────────────────
+async function startAll() {
+  const ok = await startCamera();
+  if (!ok) return;
+
+  isRunning = true;
+  lastText = '';
+  startTime = Date.now();
+
+  setStatus('active', 'Reading lips…');
+  document.getElementById('btn-start').disabled = true;
+  document.getElementById('btn-stop').disabled = false;
+
+  timerInterval = setInterval(() => {
+    document.getElementById('stat-time').textContent = formatTime(Date.now() - startTime);
+  }, 1000);
+
+  // Initial draw
+  drawOverlay(false);
+
+  // Start capture loop
+  captureInterval = setInterval(captureAndAnalyze, intervalMs);
 }
 
-// ── Events ─────────────────────────────────────────────
+function stopAll() {
+  isRunning = false;
+  clearInterval(captureInterval);
+  clearInterval(timerInterval);
+  stopCamera();
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  liveSubtitle.textContent = '—';
+  procBadge.classList.remove('show');
+  latencyBadge.classList.remove('show');
+  setStatus('idle', 'Ready');
+  document.getElementById('btn-start').disabled = false;
+  document.getElementById('btn-stop').disabled = true;
+}
+
+// ── Events ────────────────────────────────────────────
 document.getElementById('btn-start').addEventListener('click', startAll);
 document.getElementById('btn-stop').addEventListener('click', stopAll);
 
 document.getElementById('btn-clear').addEventListener('click', () => {
-  transcripts = [];
-  wordCount = 0;
-  transcriptLog.innerHTML = '';
-  const es = document.createElement('div');
-  es.className = 'empty-state';
-  es.id = 'empty-state';
-  es.innerHTML = '<div class="icon">📝</div><p>Recognized speech will appear here as you speak.</p>';
-  transcriptLog.appendChild(es);
-  updateStats();
+  transcripts = []; wordCount = 0;
+  logEl.innerHTML = '';
+  const e = document.createElement('div');
+  e.className = 'empty-log'; e.id = 'empty-log';
+  e.innerHTML = '<div class="e-icon">💬</div><p>립리딩으로 인식된 텍스트가<br>여기에 표시됩니다.</p>';
+  logEl.appendChild(e);
+  document.getElementById('stat-words').textContent = '0';
+  document.getElementById('stat-lines').textContent = '0';
+  liveSubtitle.textContent = '—';
+  lastText = '';
 });
 
 document.getElementById('btn-copy-all').addEventListener('click', () => {
@@ -955,7 +1158,20 @@ document.getElementById('btn-copy-all').addEventListener('click', () => {
   navigator.clipboard.writeText(all).then(() => showToast('✅ All copied!'));
 });
 
-document.getElementById('font-slider').addEventListener('input', (e) => {
+document.getElementById('btn-export').addEventListener('click', () => {
+  if (!transcripts.length) { showToast('No data to export'); return; }
+  const content = transcripts.map((t, i) =>
+    `[${formatTime(t.time - startTime)}] ${t.text}`
+  ).join('\n');
+  const blob = new Blob([content], { type: 'text/plain' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `lipreading-${new Date().toISOString().slice(0,10)}.txt`;
+  a.click();
+  showToast('📄 Exported!');
+});
+
+document.getElementById('font-slider').addEventListener('input', e => {
   liveSubtitle.style.fontSize = e.target.value + 'px';
 });
 </script>
