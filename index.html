@@ -3,1327 +3,785 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>LipRead AI — Microphone-Free Subtitles</title>
+<title>LipSense — Real-time Lipreading</title>
 <style>
-  @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=Space+Mono:wght@400;700&display=swap');
-
-  :root {
-    --bg: #07070d;
-    --surface: #0f0f18;
-    --surface2: #16161f;
-    --surface3: #1e1e2a;
-    --border: #262633;
-    --accent: #6c5ce7;
-    --accent2: #a29bfe;
-    --accent3: #fd79a8;
-    --text: #eeeef5;
-    --text-dim: #7a7a95;
-    --text-muted: #3d3d55;
-    --green: #00cec9;
-    --red: #ff4d6d;
-    --yellow: #ffd166;
-  }
-
-  * { box-sizing: border-box; margin: 0; padding: 0; }
-
-  body {
-    background: var(--bg);
-    color: var(--text);
-    font-family: 'Space Grotesk', sans-serif;
-    min-height: 100vh;
-    display: flex;
-    flex-direction: column;
-  }
-
-  /* ── API Key Screen ── */
-  #setup-screen {
-    position: fixed;
-    inset: 0;
-    background: var(--bg);
-    z-index: 100;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 24px;
-  }
-
-  .setup-card {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 20px;
-    padding: 40px 44px;
-    max-width: 460px;
-    width: 100%;
-    display: flex;
-    flex-direction: column;
-    gap: 24px;
-  }
-
-  .setup-logo {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-  }
-
-  .logo-icon {
-    width: 44px; height: 44px;
-    background: linear-gradient(135deg, var(--accent), var(--accent2));
-    border-radius: 12px;
-    display: flex; align-items: center; justify-content: center;
-    font-size: 22px;
-  }
-
-  .setup-title {
-    font-size: 1.5rem;
-    font-weight: 700;
-    letter-spacing: -0.03em;
-  }
-
-  .setup-sub {
-    font-size: 0.88rem;
-    color: var(--text-dim);
-    line-height: 1.6;
-  }
-
-  .setup-sub a {
-    color: var(--accent2);
-    text-decoration: none;
-  }
-  .setup-sub a:hover { text-decoration: underline; }
-
-  .input-group {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-  }
-
-  .input-label {
-    font-size: 0.78rem;
-    font-family: 'Space Mono', monospace;
-    color: var(--text-dim);
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
-  }
-
-  .api-input-wrap {
-    position: relative;
-  }
-
-  .api-input {
-    width: 100%;
-    background: var(--surface2);
-    border: 1px solid var(--border);
-    border-radius: 10px;
-    padding: 12px 48px 12px 16px;
-    font-family: 'Space Mono', monospace;
-    font-size: 0.85rem;
-    color: var(--text);
-    outline: none;
-    transition: border-color 0.2s;
-  }
-  .api-input:focus { border-color: var(--accent); }
-  .api-input::placeholder { color: var(--text-muted); }
-
-  .toggle-vis {
-    position: absolute;
-    right: 14px; top: 50%;
-    transform: translateY(-50%);
-    background: none; border: none;
-    color: var(--text-muted);
-    cursor: pointer;
-    font-size: 16px;
-    transition: color 0.2s;
-  }
-  .toggle-vis:hover { color: var(--text-dim); }
-
-  .setup-hint {
-    font-size: 0.75rem;
-    color: var(--text-muted);
-    line-height: 1.5;
-  }
-
-  .btn-setup {
-    padding: 13px;
-    background: linear-gradient(135deg, var(--accent), var(--accent2));
-    border: none;
-    border-radius: 10px;
-    color: #fff;
-    font-family: 'Space Grotesk', sans-serif;
-    font-weight: 700;
-    font-size: 0.95rem;
-    cursor: pointer;
-    transition: opacity 0.2s, transform 0.15s;
-    letter-spacing: 0.01em;
-  }
-  .btn-setup:hover { opacity: 0.88; transform: translateY(-1px); }
-  .btn-setup:active { transform: translateY(0); }
-
-  /* ── Main App ── */
-  #app-screen { display: none; flex-direction: column; height: 100vh; }
-
-  header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 14px 28px;
-    border-bottom: 1px solid var(--border);
-    background: var(--surface);
-    flex-shrink: 0;
-  }
-
-  .logo {
-    display: flex; align-items: center; gap: 10px;
-    font-family: 'Space Mono', monospace;
-    font-weight: 700;
-    font-size: 1.05rem;
-    color: var(--text);
-  }
-
-  .logo-sm {
-    width: 28px; height: 28px;
-    background: linear-gradient(135deg, var(--accent), var(--accent2));
-    border-radius: 7px;
-    display: flex; align-items: center; justify-content: center;
-    font-size: 14px;
-  }
-
-  .header-right {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-  }
-
-  .status-pill {
-    display: flex; align-items: center; gap: 7px;
-    font-size: 0.75rem;
-    font-family: 'Space Mono', monospace;
-    color: var(--text-dim);
-    background: var(--surface2);
-    border: 1px solid var(--border);
-    border-radius: 20px;
-    padding: 5px 13px;
-  }
-
-  .status-dot {
-    width: 7px; height: 7px;
-    border-radius: 50%;
-    background: var(--text-muted);
-    transition: all 0.3s;
-  }
-  .status-dot.active {
-    background: var(--green);
-    box-shadow: 0 0 8px var(--green);
-    animation: pulse 1.2s infinite;
-  }
-  .status-dot.error { background: var(--red); }
-
-  @keyframes pulse {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0.3; }
-  }
-
-  .key-badge {
-    font-size: 0.7rem;
-    font-family: 'Space Mono', monospace;
-    color: var(--text-muted);
-    background: var(--surface2);
-    border: 1px solid var(--border);
-    border-radius: 6px;
-    padding: 4px 10px;
-    cursor: pointer;
-    transition: all 0.2s;
-  }
-  .key-badge:hover { border-color: var(--accent); color: var(--accent2); }
-
-  /* ── Layout ── */
-  .app-body {
-    flex: 1;
-    display: grid;
-    grid-template-columns: 1fr 360px;
-    overflow: hidden;
-  }
-
-  /* ── Camera ── */
-  .camera-section {
-    display: flex;
-    flex-direction: column;
-    background: #04040a;
-    border-right: 1px solid var(--border);
-    position: relative;
-    overflow: hidden;
-  }
-
-  .camera-main {
-    flex: 1;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    position: relative;
-  }
-
-  .camera-wrap {
-    position: relative;
-    width: 100%;
-    max-width: 700px;
-    aspect-ratio: 16/9;
-  }
-
-  #video {
-    width: 100%; height: 100%;
-    object-fit: cover;
-    border-radius: 14px;
-    transform: scaleX(-1);
-    display: block;
-  }
-
-  #canvas {
-    position: absolute; top: 0; left: 0;
-    width: 100%; height: 100%;
-    border-radius: 14px;
-    pointer-events: none;
-    transform: scaleX(-1);
-  }
-
-  /* Scanning animation */
-  .scan-line {
-    position: absolute;
-    left: 0; right: 0;
-    height: 2px;
-    background: linear-gradient(90deg, transparent, var(--accent), var(--accent2), transparent);
-    opacity: 0;
-    pointer-events: none;
-    border-radius: 14px;
-    transition: opacity 0.3s;
-  }
-  .scan-line.active {
-    opacity: 0.6;
-    animation: scanMove 0.7s ease-in-out;
-  }
-  @keyframes scanMove {
-    0% { top: 30%; }
-    100% { top: 75%; }
-  }
-
-  /* Subtitle overlay */
-  .subtitle-overlay {
-    position: absolute;
-    bottom: 16px;
-    left: 50%; transform: translateX(-50%);
-    width: calc(100% - 32px);
-    text-align: center;
-    z-index: 10;
-  }
-
-  .subtitle-box {
-    display: inline-block;
-    background: rgba(7, 7, 13, 0.85);
-    backdrop-filter: blur(16px);
-    border: 1px solid rgba(108, 92, 231, 0.35);
-    border-radius: 10px;
-    padding: 10px 24px;
-    min-height: 44px;
-    max-width: 100%;
-    transition: border-color 0.3s;
-  }
-  .subtitle-box.fresh { border-color: rgba(108, 92, 231, 0.8); }
-
-  #live-subtitle {
-    font-size: 1.2rem;
-    font-weight: 500;
-    color: #fff;
-    line-height: 1.45;
-    transition: font-size 0.2s;
-  }
-
-  /* Placeholder */
-  .cam-placeholder {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 14px;
-    color: var(--text-muted);
-    text-align: center;
-    padding: 32px;
-  }
-  .cam-placeholder .icon { font-size: 48px; opacity: 0.3; }
-  .cam-placeholder p { font-size: 0.85rem; line-height: 1.6; max-width: 260px; }
-
-  /* ── Bottom controls ── */
-  .controls {
-    padding: 14px 20px;
-    background: var(--surface);
-    border-top: 1px solid var(--border);
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    flex-wrap: wrap;
-    flex-shrink: 0;
-  }
-
-  .btn {
-    display: flex; align-items: center; gap: 7px;
-    padding: 9px 18px;
-    border: none; border-radius: 8px;
-    font-family: 'Space Grotesk', sans-serif;
-    font-weight: 600; font-size: 0.85rem;
-    cursor: pointer; transition: all 0.15s;
-  }
-  .btn-primary {
-    background: linear-gradient(135deg, var(--accent), var(--accent2));
-    color: #fff;
-  }
-  .btn-primary:hover { opacity: 0.85; transform: translateY(-1px); }
-  .btn-stop {
-    background: rgba(255,77,109,0.12);
-    color: var(--red);
-    border: 1px solid rgba(255,77,109,0.25);
-  }
-  .btn-stop:hover { background: rgba(255,77,109,0.2); }
-  .btn-ghost {
-    background: var(--surface2);
-    color: var(--text-dim);
-    border: 1px solid var(--border);
-  }
-  .btn-ghost:hover { border-color: var(--accent); color: var(--text); }
-  .btn:disabled { opacity: 0.3; cursor: not-allowed; transform: none !important; }
-
-  /* Interval selector */
-  .interval-group {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    font-size: 0.78rem;
-    color: var(--text-dim);
-  }
-
-  .interval-btns { display: flex; gap: 4px; }
-
-  .ivbtn {
-    padding: 5px 10px;
-    background: var(--surface2);
-    border: 1px solid var(--border);
-    border-radius: 6px;
-    font-family: 'Space Mono', monospace;
-    font-size: 0.72rem;
-    color: var(--text-dim);
-    cursor: pointer;
-    transition: all 0.15s;
-  }
-  .ivbtn:hover { border-color: var(--accent); }
-  .ivbtn.active {
-    background: rgba(108,92,231,0.2);
-    border-color: var(--accent);
-    color: var(--accent2);
-  }
-
-  .spacer { flex: 1; }
-
-  /* Font size */
-  .font-control {
-    display: flex; align-items: center; gap: 6px;
-    font-size: 0.75rem; color: var(--text-dim);
-  }
-  input[type=range] {
-    -webkit-appearance: none;
-    width: 70px; height: 3px;
-    background: var(--border); border-radius: 2px; outline: none;
-  }
-  input[type=range]::-webkit-slider-thumb {
-    -webkit-appearance: none;
-    width: 13px; height: 13px;
-    border-radius: 50%; background: var(--accent); cursor: pointer;
-  }
-
-  /* ── Side Panel ── */
-  .side-panel {
-    background: var(--surface);
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
-  }
-
-  .panel-head {
-    padding: 18px 20px 12px;
-    border-bottom: 1px solid var(--border);
-    display: flex; align-items: center; justify-content: space-between;
-    flex-shrink: 0;
-  }
-
-  .panel-title {
-    font-size: 0.72rem;
-    font-family: 'Space Mono', monospace;
-    color: var(--text-dim);
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
-  }
-
-  .panel-actions { display: flex; gap: 6px; }
-
-  .icon-btn {
-    background: none; border: none;
-    color: var(--text-muted); cursor: pointer;
-    font-size: 0.72rem;
-    font-family: 'Space Mono', monospace;
-    padding: 3px 8px;
-    border-radius: 5px;
-    transition: all 0.2s;
-    border: 1px solid transparent;
-  }
-  .icon-btn:hover { border-color: var(--border); color: var(--text-dim); }
-  .icon-btn.danger:hover { border-color: rgba(255,77,109,0.3); color: var(--red); }
-
-  /* Log */
-  #log {
-    flex: 1;
-    overflow-y: auto;
-    padding: 14px 18px;
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-  }
-  #log::-webkit-scrollbar { width: 3px; }
-  #log::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
-
-  .log-item {
-    background: var(--surface2);
-    border: 1px solid var(--border);
-    border-radius: 10px;
-    padding: 10px 13px;
-    cursor: pointer;
-    transition: border-color 0.2s;
-    position: relative;
-    animation: fadeUp 0.22s ease;
-  }
-  .log-item:hover { border-color: var(--accent); }
-  .log-item:hover .copy-hint { opacity: 1; }
-
-  @keyframes fadeUp {
-    from { opacity: 0; transform: translateY(6px); }
-    to { opacity: 1; transform: translateY(0); }
-  }
-
-  .log-time {
-    font-size: 0.62rem;
-    font-family: 'Space Mono', monospace;
-    color: var(--text-muted);
-    margin-bottom: 4px;
-  }
-
-  .log-text {
-    font-size: 0.88rem;
-    line-height: 1.5;
-    color: var(--text);
-  }
-
-  .copy-hint {
-    position: absolute;
-    top: 8px; right: 10px;
-    font-size: 0.6rem;
-    color: var(--accent2);
-    font-family: 'Space Mono', monospace;
-    opacity: 0;
-    transition: opacity 0.2s;
-  }
-
-  /* confidence indicator */
-  .conf-bar {
-    margin-top: 6px;
-    height: 2px;
-    background: var(--border);
-    border-radius: 1px;
-    overflow: hidden;
-  }
-  .conf-fill {
-    height: 100%;
-    border-radius: 1px;
-    transition: width 0.3s;
-  }
-
-  .empty-log {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: 10px;
-    color: var(--text-muted);
-    text-align: center;
-    padding: 24px;
-  }
-  .empty-log .e-icon { font-size: 28px; opacity: 0.3; }
-  .empty-log p { font-size: 0.8rem; line-height: 1.5; }
-
-  /* Stats */
-  .stats {
-    padding: 12px 20px;
-    border-top: 1px solid var(--border);
-    display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    gap: 6px;
-    flex-shrink: 0;
-  }
-
-  .stat { display: flex; flex-direction: column; gap: 2px; }
-  .stat-val {
-    font-family: 'Space Mono', monospace;
-    font-size: 0.95rem;
-    font-weight: 700;
-    color: var(--text);
-  }
-  .stat-label {
-    font-size: 0.6rem;
-    color: var(--text-muted);
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-  }
-
-  /* Toast */
-  .toast {
-    position: fixed;
-    bottom: 22px; left: 50%;
-    transform: translateX(-50%) translateY(50px);
-    background: var(--surface2);
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    padding: 9px 18px;
-    font-size: 0.8rem;
-    font-family: 'Space Mono', monospace;
-    color: var(--text);
-    z-index: 999;
-    transition: transform 0.28s ease;
-    white-space: nowrap;
-  }
-  .toast.show { transform: translateX(-50%) translateY(0); }
-
-  /* Processing overlay */
-  .processing-badge {
-    position: absolute;
-    top: 14px; right: 14px;
-    background: rgba(7,7,13,0.8);
-    backdrop-filter: blur(8px);
-    border: 1px solid rgba(108,92,231,0.4);
-    border-radius: 8px;
-    padding: 6px 12px;
-    font-size: 0.7rem;
-    font-family: 'Space Mono', monospace;
-    color: var(--accent2);
-    display: none;
-    align-items: center;
-    gap: 6px;
-  }
-  .processing-badge.show { display: flex; }
-
-  .spin {
-    width: 10px; height: 10px;
-    border: 2px solid rgba(162,155,254,0.3);
-    border-top-color: var(--accent2);
-    border-radius: 50%;
-    animation: spin 0.7s linear infinite;
-  }
-  @keyframes spin { to { transform: rotate(360deg); } }
-
-  /* Latency indicator */
-  .latency-badge {
-    position: absolute;
-    top: 14px; left: 14px;
-    background: rgba(7,7,13,0.75);
-    backdrop-filter: blur(8px);
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    padding: 6px 12px;
-    font-size: 0.68rem;
-    font-family: 'Space Mono', monospace;
-    color: var(--text-muted);
-    display: none;
-  }
-  .latency-badge.show { display: block; }
-
-  @media (max-width: 760px) {
-    .app-body { grid-template-columns: 1fr; grid-template-rows: 1fr auto; }
-    .side-panel { max-height: 220px; }
-  }
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@300;400;500&display=swap');
+
+:root {
+  --ink:        #0D0D12;
+  --surface:    #13131A;
+  --panel:      #1C1C26;
+  --edge:       #2A2A38;
+  --muted:      #5A5A72;
+  --text:       #E8E8F0;
+  --sub:        #9090A8;
+  --pulse:      #00E5B4;
+  --warn:       #FF6B4A;
+  --pulse-dim:  rgba(0,229,180,0.12);
+  --pulse-glow: rgba(0,229,180,0.35);
+  --radius:     12px;
+  --mono: 'JetBrains Mono', monospace;
+  --sans: 'Space Grotesk', sans-serif;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{font-size:16px}
+body{background:var(--ink);color:var(--text);font-family:var(--sans);min-height:100vh;display:flex;flex-direction:column;overflow-x:hidden}
+
+/* HEADER */
+header{display:flex;align-items:center;justify-content:space-between;padding:18px 28px;border-bottom:1px solid var(--edge);background:var(--surface);position:sticky;top:0;z-index:100}
+.logo{display:flex;align-items:center;gap:10px;font-size:1.2rem;font-weight:700;letter-spacing:-.02em}
+.logo-dot{width:10px;height:10px;background:var(--pulse);border-radius:50%;box-shadow:0 0 12px var(--pulse-glow);animation:blink 2s ease-in-out infinite}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.3}}
+.badge{font-family:var(--mono);font-size:.62rem;font-weight:500;color:var(--pulse);background:var(--pulse-dim);border:1px solid rgba(0,229,180,.25);padding:3px 8px;border-radius:99px;letter-spacing:.06em;text-transform:uppercase}
+.hdr-info{font-size:.75rem;color:var(--muted);font-family:var(--mono)}
+
+/* MAIN */
+main{flex:1;display:grid;grid-template-columns:1fr 340px;gap:20px;padding:20px 28px;max-width:1380px;margin:0 auto;width:100%}
+
+/* CAMERA */
+.cam-section{display:flex;flex-direction:column;gap:14px}
+.video-wrapper{position:relative;background:var(--surface);border:1px solid var(--edge);border-radius:var(--radius);overflow:hidden;aspect-ratio:4/3;max-height:500px}
+.video-wrapper.active{border-color:rgba(0,229,180,.5);box-shadow:0 0 0 1px rgba(0,229,180,.15)}
+#videoEl{width:100%;height:100%;object-fit:cover;transform:scaleX(-1);display:block}
+#overlayCanvas{position:absolute;top:0;left:0;width:100%;height:100%;transform:scaleX(-1);pointer-events:none}
+#mouthCanvas{position:absolute;bottom:14px;right:14px;width:110px;height:60px;border:1.5px solid var(--pulse);border-radius:7px;background:rgba(0,0,0,.5);box-shadow:0 0 14px rgba(0,229,180,.2)}
+.mouth-label{position:absolute;bottom:78px;right:14px;font-family:var(--mono);font-size:.58rem;color:var(--pulse);letter-spacing:.08em;text-transform:uppercase}
+
+.cam-placeholder{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;color:var(--muted);background:var(--surface)}
+.cam-icon{font-size:3.5rem;opacity:.25}
+.cam-placeholder h2{font-size:1rem;font-weight:500;color:var(--sub)}
+.cam-placeholder p{font-size:.8rem;color:var(--muted);text-align:center;max-width:300px;line-height:1.6}
+.cam-placeholder .notice{font-size:.72rem;color:rgba(255,107,74,.8);font-family:var(--mono);padding:7px 13px;border:1px solid rgba(255,107,74,.25);border-radius:7px;text-align:center;line-height:1.6}
+
+@keyframes scanline{0%{transform:translateY(-100%)}100%{transform:translateY(200%)}}
+.scan-line{display:none;position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,var(--pulse),transparent);opacity:.35;animation:scanline 3.5s linear infinite;pointer-events:none}
+.video-wrapper.active .scan-line{display:block}
+
+/* STATUS BAR */
+.status-bar{display:flex;align-items:center;gap:8px;font-family:var(--mono);font-size:.7rem;color:var(--sub);padding:8px 12px;background:var(--panel);border:1px solid var(--edge);border-radius:8px}
+.status-dot{width:6px;height:6px;border-radius:50%;background:var(--muted);flex-shrink:0;transition:all .3s}
+.status-dot.on{background:var(--pulse);box-shadow:0 0 8px var(--pulse-glow)}
+.status-dot.warn{background:var(--warn)}
+#statusText{flex:1}
+#fpsDisplay{color:var(--pulse)}
+
+/* CONTROLS */
+.controls{display:flex;gap:8px;flex-wrap:wrap}
+.btn{display:inline-flex;align-items:center;gap:7px;padding:9px 18px;border-radius:8px;font-family:var(--sans);font-size:.85rem;font-weight:500;cursor:pointer;border:none;transition:all .2s;user-select:none}
+.btn-primary{background:var(--pulse);color:var(--ink)}
+.btn-primary:hover:not(:disabled){filter:brightness(1.1);box-shadow:0 4px 18px var(--pulse-glow)}
+.btn-secondary{background:var(--panel);color:var(--text);border:1px solid var(--edge)}
+.btn-secondary:hover:not(:disabled){border-color:var(--pulse);color:var(--pulse)}
+.btn:disabled{opacity:.4;cursor:not-allowed}
+
+/* TRANSCRIPT */
+.transcript-panel{background:var(--surface);border:1px solid var(--edge);border-radius:var(--radius);padding:16px;display:flex;flex-direction:column;gap:10px}
+.panel-title{font-size:.68rem;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);display:flex;justify-content:space-between;align-items:center}
+.panel-title span{font-family:var(--mono);color:var(--pulse)}
+.transcript-box{font-family:var(--mono);font-size:.8rem;line-height:1.8;color:var(--text);background:var(--panel);border:1px solid var(--edge);border-radius:8px;padding:12px;min-height:70px;word-break:break-word;max-height:130px;overflow-y:auto;scrollbar-width:thin;scrollbar-color:var(--edge) transparent}
+.word-stream{display:flex;flex-wrap:wrap;gap:5px;max-height:80px;overflow-y:auto;scrollbar-width:thin;scrollbar-color:var(--edge) transparent}
+.word-chip{font-family:var(--mono);font-size:.75rem;padding:3px 9px;background:var(--panel);border:1px solid var(--edge);border-radius:99px;color:var(--sub);animation:popIn .2s ease;transition:all .2s}
+.word-chip.new{border-color:rgba(0,229,180,.55);color:var(--pulse)}
+@keyframes popIn{from{transform:scale(.8);opacity:0}to{transform:scale(1);opacity:1}}
+.cursor-blink{display:inline-block;width:2px;height:.9em;background:var(--pulse);vertical-align:text-bottom;animation:blink 1s step-end infinite}
+
+/* RIGHT */
+.right-col{display:flex;flex-direction:column;gap:16px}
+.panel{background:var(--surface);border:1px solid var(--edge);border-radius:var(--radius);padding:16px;display:flex;flex-direction:column;gap:12px}
+
+/* TABS */
+.mode-tabs{display:flex;gap:3px;background:var(--panel);border:1px solid var(--edge);border-radius:8px;padding:3px}
+.tab{flex:1;padding:6px 8px;border-radius:6px;font-size:.75rem;font-weight:500;cursor:pointer;border:none;background:transparent;color:var(--muted);transition:all .2s;font-family:var(--sans)}
+.tab.active{background:var(--ink);color:var(--pulse);border:1px solid rgba(0,229,180,.3)}
+
+/* VISEME / PHONEME */
+.viseme-display{text-align:center;padding:4px 0}
+.viseme-current{font-family:var(--mono);font-size:2.2rem;font-weight:300;color:var(--pulse);text-shadow:0 0 28px var(--pulse-glow);transition:transform .1s;min-height:2.6rem;letter-spacing:.05em}
+.viseme-label{font-size:.82rem;color:var(--sub);margin-top:3px;min-height:1.1em;font-weight:500}
+.viseme-desc{font-size:.72rem;color:var(--muted);min-height:1em}
+
+/* CONFIDENCE RING */
+.conf-row{display:flex;align-items:center;gap:12px}
+.ring-svg{width:58px;height:58px;flex-shrink:0}
+.ring-bg{fill:none;stroke:var(--edge);stroke-width:6}
+.ring-fill{fill:none;stroke:var(--pulse);stroke-width:6;stroke-linecap:round;stroke-dasharray:163;stroke-dashoffset:163;transform:rotate(-90deg);transform-origin:32px 32px;transition:stroke-dashoffset .3s;filter:drop-shadow(0 0 4px var(--pulse-glow))}
+.conf-meta{display:flex;flex-direction:column;gap:2px}
+.conf-label{font-family:var(--mono);font-size:.6rem;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
+.conf-pct{font-family:var(--mono);font-size:.95rem;font-weight:500;color:var(--pulse)}
+
+/* METRICS */
+.metrics-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.metric-card{background:var(--panel);border:1px solid var(--edge);border-radius:8px;padding:10px;transition:border-color .2s}
+.metric-card.active{border-color:rgba(0,229,180,.38)}
+.metric-label{font-family:var(--mono);font-size:.59rem;color:var(--muted);letter-spacing:.06em;text-transform:uppercase;margin-bottom:3px}
+.metric-value{font-family:var(--mono);font-size:1.1rem;font-weight:500;color:var(--text)}
+.metric-bar{margin-top:5px;height:3px;background:var(--edge);border-radius:99px;overflow:hidden}
+.metric-fill{height:100%;background:var(--pulse);border-radius:99px;transition:width .14s}
+
+/* VISEME GRID */
+.viseme-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:5px}
+.vg-cell{background:var(--panel);border:1px solid var(--edge);border-radius:6px;padding:6px 4px;text-align:center;transition:all .2s;cursor:default}
+.vg-cell.lit{border-color:var(--pulse);background:var(--pulse-dim);box-shadow:0 0 8px rgba(0,229,180,.15)}
+.vg-symbol{font-family:var(--mono);font-size:.9rem;font-weight:500;color:var(--text)}
+.vg-cell.lit .vg-symbol{color:var(--pulse)}
+.vg-name{font-size:.58rem;color:var(--muted);margin-top:2px}
+
+/* LANDMARK */
+#landmarkMini{width:100%;height:80px;border-radius:8px;background:var(--panel);border:1px solid var(--edge);display:block}
+
+/* HELP */
+.help-box{font-size:.72rem;color:var(--muted);line-height:1.7;padding:12px 14px;background:var(--panel);border:1px solid var(--edge);border-radius:8px}
+.help-box strong{color:var(--sub);font-weight:500}
+.help-box code{color:var(--pulse);font-family:var(--mono);font-size:.68rem}
+
+/* ERROR TOAST */
+#errorToast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(90px);background:#1e1010;color:var(--warn);border:1px solid var(--warn);border-radius:10px;padding:12px 20px;font-family:var(--mono);font-size:.78rem;z-index:9999;transition:transform .3s ease;max-width:500px;text-align:center;line-height:1.5}
+#errorToast.show{transform:translateX(-50%) translateY(0)}
+
+/* LOADER */
+#loaderOverlay{display:none;position:fixed;inset:0;background:rgba(13,13,18,.92);z-index:998;align-items:center;justify-content:center;flex-direction:column;gap:14px}
+#loaderOverlay.show{display:flex}
+.loader-ring{width:44px;height:44px;border:3px solid var(--edge);border-top-color:var(--pulse);border-radius:50%;animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.loader-text{font-family:var(--mono);font-size:.82rem;color:var(--sub)}
+
+/* FOOTER */
+footer{border-top:1px solid var(--edge);padding:12px 28px;font-size:.68rem;color:var(--muted);display:flex;justify-content:space-between;font-family:var(--mono)}
+
+@media(max-width:860px){
+  main{grid-template-columns:1fr;padding:12px}
+  .right-col{flex-direction:row;flex-wrap:wrap}
+  .right-col .panel{flex:1 1 200px}
+}
 </style>
-<script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
-<script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/face_mesh.js" crossorigin="anonymous"></script>
 </head>
 <body>
 
-<!-- ── API Key Setup Screen ── -->
-<div id="setup-screen">
-  <div class="setup-card">
-    <div class="setup-logo">
-      <div class="logo-icon">👄</div>
-      <div>
-        <div class="setup-title">LipRead AI</div>
-      </div>
-    </div>
-
-    <p class="setup-sub">
-      카메라 영상만으로 실시간 립리딩 자막을 생성합니다.<br>
-      마이크 불필요 — Gemini Vision API 사용.<br><br>
-      API 키는 <a href="https://aistudio.google.com/app/apikey" target="_blank">Google AI Studio</a>에서 무료로 발급받을 수 있습니다.
-    </p>
-
-    <div class="input-group">
-      <div class="input-label">Gemini API Key</div>
-      <div class="api-input-wrap">
-        <input class="api-input" id="api-key-input" type="password"
-          placeholder="AIza..." autocomplete="off" spellcheck="false">
-        <button class="toggle-vis" id="toggle-vis" title="Show/hide key">👁</button>
-      </div>
-      <div class="setup-hint">키는 브라우저 로컬에만 저장되며 외부로 전송되지 않습니다.</div>
-    </div>
-
-    <button class="btn-setup" id="btn-confirm-key">시작하기 →</button>
-  </div>
+<div id="loaderOverlay">
+  <div class="loader-ring"></div>
+  <div class="loader-text" id="loaderMsg">Initializing MediaPipe...</div>
 </div>
 
-<!-- ── Main App ── -->
-<div id="app-screen">
-  <header>
-    <div class="logo">
-      <div class="logo-sm">👄</div>
-      LipRead AI
-    </div>
-    <div class="header-right">
-      <div class="status-pill">
-        <div class="status-dot" id="status-dot"></div>
-        <span id="status-text">Ready</span>
-      </div>
-      <div class="key-badge" id="key-badge" title="Click to change API key">●●●●●●●</div>
-    </div>
-  </header>
+<div id="errorToast"></div>
 
-  <div class="app-body">
-    <!-- Camera -->
-    <div class="camera-section">
-      <div class="camera-main" id="camera-main">
-        <div class="cam-placeholder" id="cam-placeholder">
-          <div class="icon">📷</div>
-          <p>Start 버튼을 눌러<br>카메라를 활성화하고<br>립리딩을 시작하세요.</p>
-        </div>
-
-        <div class="camera-wrap" id="camera-wrap" style="display:none">
-          <video id="video" autoplay muted playsinline></video>
-          <canvas id="canvas"></canvas>
-          <div class="scan-line" id="scan-line"></div>
-
-          <div class="latency-badge" id="latency-badge"></div>
-
-          <div class="processing-badge" id="proc-badge">
-            <div class="spin"></div>
-            Analyzing…
-          </div>
-
-          <div class="subtitle-overlay">
-            <div class="subtitle-box" id="subtitle-box">
-              <div id="live-subtitle">—</div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div class="controls">
-        <button class="btn btn-primary" id="btn-start">▶ Start</button>
-        <button class="btn btn-stop" id="btn-stop" disabled>⏹ Stop</button>
-
-        <div class="interval-group">
-          <span>Interval</span>
-          <div class="interval-btns">
-            <button class="ivbtn" data-ms="800">0.8s</button>
-            <button class="ivbtn active" data-ms="1500">1.5s</button>
-            <button class="ivbtn" data-ms="2500">2.5s</button>
-            <button class="ivbtn" data-ms="4000">4s</button>
-          </div>
-        </div>
-
-        <div class="spacer"></div>
-
-        <div class="font-control">
-          <span style="font-size:12px">A</span>
-          <input type="range" id="font-slider" min="14" max="30" value="19">
-          <span style="font-size:18px">A</span>
-        </div>
-
-        <button class="btn btn-ghost" id="btn-copy-all">📋 Copy</button>
-      </div>
-    </div>
-
-    <!-- Side Panel -->
-    <div class="side-panel">
-      <div class="panel-head">
-        <span class="panel-title">Transcript</span>
-        <div class="panel-actions">
-          <button class="icon-btn" id="btn-export">Export</button>
-          <button class="icon-btn danger" id="btn-clear">Clear</button>
-        </div>
-      </div>
-
-      <div id="log">
-        <div class="empty-log" id="empty-log">
-          <div class="e-icon">💬</div>
-          <p>립리딩으로 인식된 텍스트가<br>여기에 표시됩니다.</p>
-        </div>
-      </div>
-
-      <div class="stats">
-        <div class="stat">
-          <div class="stat-val" id="stat-words">0</div>
-          <div class="stat-label">Words</div>
-        </div>
-        <div class="stat">
-          <div class="stat-val" id="stat-lines">0</div>
-          <div class="stat-label">Lines</div>
-        </div>
-        <div class="stat">
-          <div class="stat-val" id="stat-api">0</div>
-          <div class="stat-label">API calls</div>
-        </div>
-        <div class="stat">
-          <div class="stat-val" id="stat-time">0:00</div>
-          <div class="stat-label">Time</div>
-        </div>
-      </div>
-    </div>
+<header>
+  <div class="logo">
+    <div class="logo-dot"></div>
+    LipSense
   </div>
-</div>
+  <div style="display:flex;gap:10px;align-items:center">
+    <span class="badge">BETA</span>
+    <span class="hdr-info">MediaPipe FaceMesh · WebRTC · English</span>
+  </div>
+</header>
 
-<div class="toast" id="toast"></div>
+<main>
+  <!-- CAMERA SECTION -->
+  <section class="cam-section">
+    <div class="video-wrapper" id="videoWrapper">
+      <div class="cam-placeholder" id="camPlaceholder">
+        <div class="cam-icon">👄</div>
+        <h2>Real-time Lipreading</h2>
+        <p>MediaPipe FaceMesh tracks 40 lip landmarks in real time to classify English visemes and detect words.</p>
+        <div class="notice">⚠ Camera is blocked on file:// URLs.<br>
+          Run a local server: <strong>python -m http.server 8080</strong><br>
+          then open <strong>http://localhost:8080</strong></div>
+      </div>
+      <video id="videoEl" autoplay muted playsinline></video>
+      <canvas id="overlayCanvas"></canvas>
+      <canvas id="mouthCanvas"></canvas>
+      <div class="mouth-label">Lip Zoom</div>
+      <div class="scan-line"></div>
+    </div>
+
+    <div class="status-bar">
+      <div class="status-dot" id="statusDot"></div>
+      <span id="statusText">Idle — press Start Camera to begin</span>
+      <span id="fpsDisplay"></span>
+    </div>
+
+    <div class="controls">
+      <button class="btn btn-primary" id="startBtn" onclick="startCamera()">▶ Start Camera</button>
+      <button class="btn btn-secondary" id="stopBtn" onclick="stopCamera()" disabled>■ Stop</button>
+      <button class="btn btn-secondary" onclick="clearAll()">↺ Clear</button>
+    </div>
+
+    <div class="transcript-panel">
+      <div class="panel-title">
+        Recognized Text
+        <span id="wordCount">0 words</span>
+      </div>
+      <div class="transcript-box" id="transcriptBox">
+        <span style="color:var(--muted)">Lipreading output will appear here...</span>
+      </div>
+      <div class="word-stream" id="wordStream"></div>
+    </div>
+  </section>
+
+  <!-- RIGHT COLUMN -->
+  <aside class="right-col">
+
+    <!-- Mode + Viseme -->
+    <div class="panel">
+      <div class="panel-title">Recognition Mode</div>
+      <div class="mode-tabs">
+        <button class="tab active" id="tabViseme" onclick="setMode('viseme')">Viseme</button>
+        <button class="tab" id="tabWord"   onclick="setMode('word')">Word</button>
+        <button class="tab" id="tabSentence" onclick="setMode('sentence')">Sentence</button>
+      </div>
+
+      <div class="viseme-display">
+        <div class="viseme-current" id="visemeCurrent">—</div>
+        <div class="viseme-label"   id="visemeLabel">Awaiting lip movement</div>
+        <div class="viseme-desc"    id="visemeDesc"></div>
+      </div>
+
+      <div class="conf-row">
+        <svg class="ring-svg" viewBox="0 0 64 64">
+          <circle class="ring-bg"   cx="32" cy="32" r="26"/>
+          <circle class="ring-fill" id="ringFill" cx="32" cy="32" r="26"/>
+        </svg>
+        <div class="conf-meta">
+          <div class="conf-label">Confidence</div>
+          <div class="conf-pct" id="confPct">0%</div>
+        </div>
+      </div>
+
+      <!-- Viseme palette -->
+      <div class="viseme-grid" id="visemeGrid"></div>
+    </div>
+
+    <!-- Lip Metrics -->
+    <div class="panel">
+      <div class="panel-title">Lip Metrics</div>
+      <div class="metrics-grid">
+        <div class="metric-card" id="mcMAR">
+          <div class="metric-label">MAR</div>
+          <div class="metric-value" id="mMAR">0.00</div>
+          <div class="metric-bar"><div class="metric-fill" id="bMAR" style="width:0%"></div></div>
+        </div>
+        <div class="metric-card" id="mcOpen">
+          <div class="metric-label">Aperture</div>
+          <div class="metric-value" id="mOpen">Closed</div>
+          <div class="metric-bar"><div class="metric-fill" id="bOpen" style="width:0%"></div></div>
+        </div>
+        <div class="metric-card" id="mcWidth">
+          <div class="metric-label">Width</div>
+          <div class="metric-value" id="mWidth">—</div>
+          <div class="metric-bar"><div class="metric-fill" id="bWidth" style="width:0%"></div></div>
+        </div>
+        <div class="metric-card" id="mcRound">
+          <div class="metric-label">Roundness</div>
+          <div class="metric-value" id="mRound">0%</div>
+          <div class="metric-bar"><div class="metric-fill" id="bRound" style="width:0%"></div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Landmark map -->
+    <div class="panel">
+      <div class="panel-title">Lip Landmarks (40 pts)</div>
+      <canvas id="landmarkMini"></canvas>
+    </div>
+
+    <!-- Help -->
+    <div class="panel help-box">
+      <div class="panel-title" style="margin-bottom:6px">Quick Start</div>
+      <p><strong>1.</strong> Serve this file locally:<br>
+         <code>python -m http.server 8080</code><br>
+         then visit <code>http://localhost:8080</code></p>
+      <p style="margin-top:8px"><strong>2.</strong> Allow camera when prompted</p>
+      <p style="margin-top:8px"><strong>3.</strong> Face the camera straight on with good lighting</p>
+      <p style="margin-top:8px"><strong>4.</strong> Switch to <strong>Word</strong> mode and try saying: <em>hello, yes, no, thank you, sorry</em></p>
+    </div>
+
+  </aside>
+</main>
+
+<footer>
+  <span>LipSense v1.2 EN — 100% in-browser, no server upload</span>
+  <span>MediaPipe FaceMesh + WebRTC getUserMedia</span>
+</footer>
+
+<!-- MediaPipe -->
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/face_mesh.js" crossorigin="anonymous"></script>
 
 <script>
-// ── State ─────────────────────────────────────────────
-let apiKey = '';
-let stream = null;
-let isRunning = false;
-let captureInterval = null;
-let timerInterval = null;
-let intervalMs = 1500;
-let startTime = null;
-let transcripts = [];
-let wordCount = 0;
-let apiCalls = 0;
-let isAnalyzing = false;
-let lastText = '';
-let faceMesh = null;
-let mpCamera = null;
-let currentLandmarks = null; // latest face landmarks from MediaPipe
-let isAnalyzing2 = false;    // alias guard
+/* ═══════════════════════════════════════════════════
+   LIP LANDMARK INDICES — MediaPipe 468-point FaceMesh
+   Outer: 20 pts   Inner: 20 pts
+═══════════════════════════════════════════════════ */
+const LIP_OUTER=[61,185,40,39,37,0,267,269,270,409,291,375,321,405,314,17,84,181,91,146];
+const LIP_INNER=[78,191,80,81,82,13,312,311,310,415,308,324,318,402,317,14,87,178,88,95];
+const LIP_ALL=[...new Set([...LIP_OUTER,...LIP_INNER])];
 
-// ── Elements ─────────────────────────────────────────
-const video = document.getElementById('video');
-const canvas = document.getElementById('canvas');
-const ctx = canvas.getContext('2d');
-const liveSubtitle = document.getElementById('live-subtitle');
-const subtitleBox = document.getElementById('subtitle-box');
-const statusDot = document.getElementById('status-dot');
-const statusText = document.getElementById('status-text');
-const logEl = document.getElementById('log');
-const scanLine = document.getElementById('scan-line');
-const procBadge = document.getElementById('proc-badge');
-const latencyBadge = document.getElementById('latency-badge');
+const P_TOP=13,P_BOT=14,P_LEFT=61,P_RIGHT=291;
 
-// ── MediaPipe lip landmark indices ────────────────────
-// Outer lip contour (61 points around the mouth)
-const LIPS_OUTER = [61,185,40,39,37,0,267,269,270,409,291,375,321,405,314,17,84,181,91,146];
-// Inner lip contour
-const LIPS_INNER = [78,191,80,81,82,13,312,311,310,415,308,324,318,402,317,14,87,178,88,95];
-// Key landmark pairs for mouth openness
-const MOUTH_TOP    = 13;
-const MOUTH_BOTTOM = 14;
-const MOUTH_LEFT   = 61;
-const MOUTH_RIGHT  = 291;
+/* ═══════════════════════════════════════════════════
+   ENGLISH VISEME TABLE
+   Each viseme groups phonemes with similar lip shapes.
+   Ranges are [min, max] for MAR, roundness, normWidth.
+═══════════════════════════════════════════════════ */
+const VISEMES = [
+  // Bilabials — lips closed or nearly closed
+  { id:'P/B/M', ipa:'/p/ /b/ /m/', example:'<b>p</b>ay · <b>b</b>ay · <b>m</b>ay',
+    desc:'Lips pressed together',
+    marR:[0.00,0.05], roundR:[0,20],  widthR:[0.42,0.65] },
 
-// ── Setup Screen ──────────────────────────────────────
-document.getElementById('toggle-vis').addEventListener('click', () => {
-  const inp = document.getElementById('api-key-input');
-  inp.type = inp.type === 'password' ? 'text' : 'password';
-});
-document.getElementById('api-key-input').addEventListener('keydown', e => {
-  if (e.key === 'Enter') confirmKey();
-});
-document.getElementById('btn-confirm-key').addEventListener('click', confirmKey);
+  // /f/ /v/ — bottom lip touches upper teeth (hard to distinguish visually, grouped)
+  { id:'F/V',   ipa:'/f/ /v/',      example:'<b>f</b>ee · <b>v</b>ow',
+    desc:'Lower lip under upper teeth',
+    marR:[0.00,0.06], roundR:[0,18],  widthR:[0.40,0.62] },
 
-function confirmKey() {
-  const val = document.getElementById('api-key-input').value.trim();
-  if (!val || !val.startsWith('AIza')) {
-    showToast('⚠️ 유효한 API 키를 입력해주세요');
-    return;
-  }
-  apiKey = val;
-  document.getElementById('setup-screen').style.display = 'none';
-  document.getElementById('app-screen').style.display = 'flex';
+  // Wide, spread — /iː/ /ɪ/ /eɪ/
+  { id:'EE/IH', ipa:'/iː/ /ɪ/ /eɪ/',example:'<b>ee</b>l · <b>i</b>t · <b>say</b>',
+    desc:'Lips wide and spread',
+    marR:[0.04,0.20], roundR:[0,12],  widthR:[0.70,1.00] },
+
+  // Open mouth — /æ/ /ɑː/ /ʌ/
+  { id:'AA/AH', ipa:'/æ/ /ɑː/ /ʌ/', example:'<b>ca</b>t · <b>fa</b>ther · <b>cu</b>p',
+    desc:'Mouth wide open',
+    marR:[0.28,0.82], roundR:[0,28],  widthR:[0.48,0.80] },
+
+  // Rounded — /uː/ /ʊ/ /oʊ/
+  { id:'OO/UH', ipa:'/uː/ /ʊ/ /oʊ/',example:'<b>oo</b>ze · <b>foo</b>t · <b>go</b>',
+    desc:'Lips rounded and protruded',
+    marR:[0.04,0.26], roundR:[60,100],widthR:[0.22,0.50] },
+
+  // Mid-open rounded — /ɔː/
+  { id:'AW',    ipa:'/ɔː/',          example:'<b>law</b> · <b>saw</b>',
+    desc:'Rounded, medium aperture',
+    marR:[0.18,0.52], roundR:[48,92], widthR:[0.28,0.55] },
+
+  // Mid-open spread — /ɛ/ /eɪ/ (front)
+  { id:'EH',    ipa:'/ɛ/ /e/',       example:'<b>be</b>d · <b>se</b>t',
+    desc:'Half-open, slightly spread',
+    marR:[0.14,0.36], roundR:[10,45], widthR:[0.54,0.82] },
+
+  // Neutral schwa — /ə/ /ɜː/
+  { id:'UH/ER', ipa:'/ə/ /ɜː/',     example:'<b>a</b>bout · <b>bir</b>d',
+    desc:'Neutral relaxed lips',
+    marR:[0.03,0.14], roundR:[5,32],  widthR:[0.52,0.78] },
+
+  // Dental/alveolar — /θ/ /ð/ /s/ /z/ /t/ /d/ /n/ /l/
+  { id:'TH/S',  ipa:'/θ/ /ð/ /s/ /z/',example:'<b>th</b>in · <b>s</b>ee',
+    desc:'Teeth close together',
+    marR:[0.01,0.08], roundR:[0,22],  widthR:[0.55,0.80] },
+
+  // Neutral / silence
+  { id:'—',     ipa:'',              example:'',
+    desc:'',
+    marR:[0.00,0.03], roundR:[0,100], widthR:[0.00,1.00] },
+];
+
+/* ═══════════════════════════════════════════════════
+   ENGLISH WORD PATTERN TABLE
+   seq = sequence of viseme IDs to match (compressed)
+═══════════════════════════════════════════════════ */
+const WORD_PATTERNS = [
+  { word:'hello',      seq:['EH','AA/AH','OO/UH'],       min:8  },
+  { word:'hi',         seq:['AA/AH','EE/IH'],            min:4  },
+  { word:'bye',        seq:['P/B/M','AA/AH','EE/IH'],    min:6  },
+  { word:'yes',        seq:['EE/IH','EH','TH/S'],        min:5  },
+  { word:'no',         seq:['AW','OO/UH'],               min:4  },
+  { word:'okay',       seq:['AW','AA/AH','EE/IH'],       min:7  },
+  { word:'please',     seq:['P/B/M','EE/IH','TH/S'],     min:7  },
+  { word:'thank you',  seq:['TH/S','AA/AH','OO/UH'],     min:8  },
+  { word:'sorry',      seq:['TH/S','AW','EE/IH'],        min:7  },
+  { word:'love you',   seq:['AA/AH','F/V','OO/UH'],      min:8  },
+  { word:'help',       seq:['EH','AA/AH','P/B/M'],       min:6  },
+  { word:'stop',       seq:['TH/S','AA/AH','P/B/M'],     min:6  },
+  { word:'come here',  seq:['AA/AH','EH','EE/IH'],       min:8  },
+  { word:'water',      seq:['AW','UH/ER'],               min:5  },
+  { word:'why',        seq:['AW','AA/AH','EE/IH'],       min:5  },
+  { word:'what',       seq:['AW','AA/AH','TH/S'],        min:5  },
+  { word:'where',      seq:['AW','EH'],                  min:4  },
+  { word:'more',       seq:['P/B/M','AW'],               min:4  },
+  { word:'maybe',      seq:['P/B/M','EE/IH','P/B/M','EE/IH'],min:10},
+  { word:'beautiful',  seq:['P/B/M','OO/UH','EE/IH','F/V'],min:12},
+];
+
+/* ═══════════════════════════════════════════════════
+   STATE
+═══════════════════════════════════════════════════ */
+let faceMesh=null,stream=null,animId=null;
+let isRunning=false,mode='viseme';
+let smoothMAR=0,lipHistory=[],wordBuf=[];
+let transcriptWords=[],totalWords=0;
+let frameN=0,lastFpsT=performance.now(),fps=0;
+
+const SMOOTH=0.22, HIST=32;
+
+/* ═══════════════════════════════════════════════════
+   DOM
+═══════════════════════════════════════════════════ */
+const videoEl   = document.getElementById('videoEl');
+const overlay   = document.getElementById('overlayCanvas');
+const mouthC    = document.getElementById('mouthCanvas');
+const landmarkC = document.getElementById('landmarkMini');
+const oc=overlay.getContext('2d'), mc=mouthC.getContext('2d'), lc=landmarkC.getContext('2d');
+
+/* Build viseme palette */
+function buildVisemeGrid() {
+  const grid = document.getElementById('visemeGrid');
+  VISEMES.filter(v=>v.id!=='—').forEach(v=>{
+    const cell = document.createElement('div');
+    cell.className='vg-cell'; cell.id='vg_'+v.id.replace(/\//g,'_');
+    cell.innerHTML=`<div class="vg-symbol">${v.id}</div><div class="vg-name">${v.ipa||''}</div>`;
+    cell.title=v.example.replace(/<[^>]+>/g,'');
+    grid.appendChild(cell);
+  });
+}
+buildVisemeGrid();
+
+/* ═══════════════════════════════════════════════════
+   MEDIAPIPE INIT
+═══════════════════════════════════════════════════ */
+async function initMediaPipe() {
+  showLoader('Downloading FaceMesh model (~33 MB)…');
+  return new Promise((resolve,reject)=>{
+    try {
+      faceMesh=new FaceMesh({
+        locateFile:f=>`https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${f}`
+      });
+      faceMesh.setOptions({maxNumFaces:1,refineLandmarks:true,
+        minDetectionConfidence:.55,minTrackingConfidence:.55});
+      faceMesh.onResults(onResults);
+      faceMesh.initialize().then(()=>{hideLoader();resolve();}).catch(e=>{hideLoader();reject(e);});
+    } catch(e){hideLoader();reject(e);}
+  });
 }
 
-document.getElementById('key-badge').addEventListener('click', () => {
-  stopAll();
-  apiKey = '';
-  document.getElementById('api-key-input').value = '';
-  document.getElementById('setup-screen').style.display = 'flex';
-  document.getElementById('app-screen').style.display = 'none';
-});
-
-// ── Interval buttons ──────────────────────────────────
-document.querySelectorAll('.ivbtn').forEach(btn => {
-  btn.addEventListener('click', () => {
-    document.querySelectorAll('.ivbtn').forEach(b => b.classList.remove('active'));
-    btn.classList.add('active');
-    intervalMs = parseInt(btn.dataset.ms);
-    if (isRunning) {
-      clearInterval(captureInterval);
-      captureInterval = setInterval(captureAndAnalyze, intervalMs);
-    }
-  });
-});
-
-// ── MediaPipe Face Mesh setup ─────────────────────────
-function initFaceMesh() {
-  faceMesh = new FaceMesh({
-    locateFile: file =>
-      `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${file}`
-  });
-  faceMesh.setOptions({
-    maxNumFaces: 1,
-    refineLandmarks: true,   // enables detailed lip & iris landmarks
-    minDetectionConfidence: 0.5,
-    minTrackingConfidence: 0.5
-  });
-  faceMesh.onResults(onFaceResults);
-}
-
-function onFaceResults(results) {
-  if (!isRunning) return;
-
-  const W = canvas.width  = video.videoWidth  || 640;
-  const H = canvas.height = video.videoHeight || 480;
-  ctx.clearRect(0, 0, W, H);
-
-  if (results.multiFaceLandmarks && results.multiFaceLandmarks.length > 0) {
-    currentLandmarks = results.multiFaceLandmarks[0];
-    drawLandmarks(currentLandmarks, W, H);
-  } else {
-    currentLandmarks = null;
-    // No face — draw faint guide oval
-    drawGuideOval(W, H);
-  }
-}
-
-// ── Draw real lip landmarks ───────────────────────────
-function drawLandmarks(landmarks, W, H) {
-  const analyzing = isAnalyzing;
-
-  // ── Helper: landmark px coords ──
-  const px = i => landmarks[i].x * W;
-  const py = i => landmarks[i].y * H;
-
-  // Mouth openness ratio
-  const mHeight = Math.abs(py(MOUTH_TOP) - py(MOUTH_BOTTOM));
-  const mWidth  = Math.abs(px(MOUTH_RIGHT) - px(MOUTH_LEFT));
-  const openRatio = mHeight / (mWidth + 0.001);
-  const isSpeaking = openRatio > 0.12;
-
-  // ── Subtle face mesh (cheeks & jaw only) ──
-  const FACE_OVAL = [10,338,297,332,284,251,389,356,454,323,361,288,397,365,379,378,400,377,152,148,176,149,150,136,172,58,132,93,234,127,162,21,54,103,67,109];
-  ctx.beginPath();
-  FACE_OVAL.forEach((idx, i) => {
-    i === 0 ? ctx.moveTo(px(idx), py(idx)) : ctx.lineTo(px(idx), py(idx));
-  });
-  ctx.closePath();
-  ctx.strokeStyle = analyzing ? 'rgba(108,92,231,0.35)' : 'rgba(108,92,231,0.15)';
-  ctx.lineWidth = 1;
-  ctx.stroke();
-
-  // ── Outer lip contour ──
-  ctx.beginPath();
-  LIPS_OUTER.forEach((idx, i) => {
-    i === 0 ? ctx.moveTo(px(idx), py(idx)) : ctx.lineTo(px(idx), py(idx));
-  });
-  ctx.closePath();
-
-  if (isSpeaking) {
-    // Glowing fill when speaking
-    const grad = ctx.createRadialGradient(
-      px(MOUTH_TOP), py(MOUTH_TOP), 0,
-      px(MOUTH_TOP), py(MOUTH_TOP), mWidth * 0.6
-    );
-    grad.addColorStop(0, 'rgba(0,206,201,0.18)');
-    grad.addColorStop(1, 'rgba(0,206,201,0)');
-    ctx.fillStyle = grad;
-    ctx.fill();
-  }
-
-  ctx.strokeStyle = isSpeaking
-    ? (analyzing ? 'rgba(0,206,201,1)' : 'rgba(0,206,201,0.75)')
-    : 'rgba(0,206,201,0.35)';
-  ctx.lineWidth = isSpeaking ? 2 : 1.2;
-  ctx.stroke();
-
-  // ── Inner lip contour ──
-  ctx.beginPath();
-  LIPS_INNER.forEach((idx, i) => {
-    i === 0 ? ctx.moveTo(px(idx), py(idx)) : ctx.lineTo(px(idx), py(idx));
-  });
-  ctx.closePath();
-  ctx.strokeStyle = isSpeaking
-    ? 'rgba(253,121,168,0.9)'
-    : 'rgba(253,121,168,0.3)';
-  ctx.lineWidth = isSpeaking ? 1.5 : 0.8;
-  ctx.stroke();
-
-  // ── Landmark dots on key lip points ──
-  const KEY_DOTS = [61, 291, 0, 17, 13, 14, 78, 308];
-  KEY_DOTS.forEach(idx => {
-    ctx.beginPath();
-    ctx.arc(px(idx), py(idx), isSpeaking ? 3 : 2, 0, Math.PI * 2);
-    ctx.fillStyle = isSpeaking
-      ? (analyzing ? '#00cec9' : 'rgba(0,206,201,0.8)')
-      : 'rgba(0,206,201,0.3)';
-    ctx.fill();
-  });
-
-  // ── Mouth openness bar (top-left HUD) ──
-  drawMouthHUD(openRatio, isSpeaking, W, H);
-}
-
-function drawMouthHUD(ratio, speaking, W, H) {
-  const barW = 80, barH = 6;
-  const x = 14, y = H - 28;
-  const fill = Math.min(1, ratio / 0.35);
-
-  ctx.fillStyle = 'rgba(7,7,13,0.65)';
-  ctx.beginPath();
-  ctx.roundRect(x - 6, y - 16, barW + 60, 28, 6);
-  ctx.fill();
-
-  ctx.fillStyle = 'rgba(255,255,255,0.12)';
-  ctx.fillRect(x, y, barW, barH);
-
-  const color = speaking ? '#00cec9' : '#6c5ce7';
-  ctx.fillStyle = color;
-  ctx.fillRect(x, y, barW * fill, barH);
-
-  ctx.fillStyle = speaking ? '#00cec9' : '#7a7a95';
-  ctx.font = '600 10px Space Grotesk, sans-serif';
-  ctx.fillText(speaking ? 'SPEAKING' : 'SILENT', x + barW + 8, y + 5);
-}
-
-function drawGuideOval(W, H) {
-  const cx = W / 2, cy = H * 0.45;
-  ctx.beginPath();
-  ctx.ellipse(cx, cy, W * 0.18, H * 0.26, 0, 0, Math.PI * 2);
-  ctx.strokeStyle = 'rgba(108,92,231,0.15)';
-  ctx.setLineDash([5, 5]);
-  ctx.lineWidth = 1;
-  ctx.stroke();
-  ctx.setLineDash([]);
-
-  ctx.fillStyle = 'rgba(122,122,149,0.4)';
-  ctx.font = '12px Space Grotesk, sans-serif';
-  ctx.textAlign = 'center';
-  ctx.fillText('얼굴을 카메라 앞에 위치시키세요', cx, cy + H * 0.3);
-  ctx.textAlign = 'left';
-}
-
-// ── Camera & MediaPipe Camera ─────────────────────────
+/* ═══════════════════════════════════════════════════
+   CAMERA
+═══════════════════════════════════════════════════ */
 async function startCamera() {
+  const btn=document.getElementById('startBtn');
+  btn.disabled=true;
+  setStatus('Requesting camera access…','warn');
   try {
-    stream = await navigator.mediaDevices.getUserMedia({
-      video: { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: 'user' },
-      audio: false
+    if(!faceMesh) await initMediaPipe();
+    stream=await navigator.mediaDevices.getUserMedia({
+      video:{width:{ideal:640},height:{ideal:480},facingMode:'user',frameRate:{ideal:30}},
+      audio:false
     });
-    video.srcObject = stream;
-    await new Promise(r => { video.onloadedmetadata = r; });
-    document.getElementById('camera-wrap').style.display = 'block';
-    document.getElementById('cam-placeholder').style.display = 'none';
-    canvas.width  = video.videoWidth  || 640;
-    canvas.height = video.videoHeight || 480;
-
-    // Start MediaPipe Camera helper (feeds frames into FaceMesh)
-    mpCamera = new Camera(video, {
-      onFrame: async () => {
-        if (faceMesh && isRunning) await faceMesh.send({ image: video });
-      },
-      width: 640, height: 360
-    });
-    await mpCamera.start();
-    return true;
-  } catch (e) {
-    showToast('📷 카메라 접근이 거부됐습니다');
-    return false;
+    videoEl.srcObject=stream;
+    await new Promise(r=>{ videoEl.onloadedmetadata=r; });
+    await videoEl.play();
+    overlay.width=videoEl.videoWidth||640;
+    overlay.height=videoEl.videoHeight||480;
+    isRunning=true;
+    document.getElementById('camPlaceholder').style.display='none';
+    document.getElementById('stopBtn').disabled=false;
+    document.getElementById('videoWrapper').classList.add('active');
+    setStatus('Lipreading active','on');
+    document.getElementById('transcriptBox').innerHTML='<span class="cursor-blink"></span>';
+    loop();
+  } catch(e) {
+    btn.disabled=false;
+    const msg = e.name==='NotAllowedError'
+      ? 'Camera permission denied. Allow camera access in browser settings.'
+      : e.name==='NotFoundError' ? 'No camera found on this device.'
+      : 'Camera error: '+e.message;
+    setStatus(msg,'warn');
+    showError(msg);
   }
 }
 
 function stopCamera() {
-  if (mpCamera) { mpCamera.stop(); mpCamera = null; }
-  if (stream)   { stream.getTracks().forEach(t => t.stop()); stream = null; }
-  currentLandmarks = null;
-  document.getElementById('camera-wrap').style.display = 'none';
-  document.getElementById('cam-placeholder').style.display = 'flex';
+  isRunning=false;
+  if(animId){cancelAnimationFrame(animId);animId=null;}
+  if(stream){stream.getTracks().forEach(t=>t.stop());stream=null;}
+  videoEl.srcObject=null;
+  document.getElementById('startBtn').disabled=false;
+  document.getElementById('stopBtn').disabled=true;
+  document.getElementById('camPlaceholder').style.display='flex';
+  document.getElementById('videoWrapper').classList.remove('active');
+  setStatus('Stopped','');
+  oc.clearRect(0,0,overlay.width,overlay.height);
+  document.getElementById('fpsDisplay').textContent='';
 }
 
-// ── Capture frame for Gemini (cropped to mouth region) ─
-function captureFrame() {
-  const offscreen = document.createElement('canvas');
-  const W = video.videoWidth  || 640;
-  const H = video.videoHeight || 480;
-
-  // If landmarks available, crop tightly around mouth (+40% padding)
-  if (currentLandmarks) {
-    const px = i => currentLandmarks[i].x * W;
-    const py = i => currentLandmarks[i].y * H;
-
-    const allX = LIPS_OUTER.map(px);
-    const allY = LIPS_OUTER.map(py);
-    const minX = Math.min(...allX), maxX = Math.max(...allX);
-    const minY = Math.min(...allY), maxY = Math.max(...allY);
-    const padX = (maxX - minX) * 0.7;
-    const padY = (maxY - minY) * 0.9;
-
-    const sx = Math.max(0, minX - padX);
-    const sy = Math.max(0, minY - padY);
-    const sw = Math.min(W - sx, (maxX - minX) + padX * 2);
-    const sh = Math.min(H - sy, (maxY - minY) + padY * 2);
-
-    // Output square-ish crop, 256×256
-    offscreen.width = 256; offscreen.height = 256;
-    const oc = offscreen.getContext('2d');
-    // Flip horizontally to match visual (video CSS is mirrored)
-    oc.translate(256, 0); oc.scale(-1, 1);
-    oc.drawImage(video, sx, sy, sw, sh, 0, 0, 256, 256);
-  } else {
-    // Fallback: full frame
-    offscreen.width = 480; offscreen.height = 270;
-    const oc = offscreen.getContext('2d');
-    oc.scale(-1, 1);
-    oc.drawImage(video, -480, 0, 480, 270);
+/* ═══════════════════════════════════════════════════
+   LOOP
+═══════════════════════════════════════════════════ */
+async function loop() {
+  if(!isRunning) return;
+  if(videoEl.readyState>=2){ try{await faceMesh.send({image:videoEl});}catch(_){} }
+  frameN++;
+  const now=performance.now();
+  if(now-lastFpsT>1000){
+    fps=Math.round(frameN*1000/(now-lastFpsT));
+    document.getElementById('fpsDisplay').textContent=fps+' fps';
+    frameN=0;lastFpsT=now;
   }
-
-  return offscreen.toDataURL('image/jpeg', 0.82).split(',')[1];
+  animId=requestAnimationFrame(loop);
 }
 
-// ── Capture & Analyze ─────────────────────────────────
-async function captureAndAnalyze() {
-  if (isAnalyzing || !isRunning) return;
-  isAnalyzing = true;
-
-  procBadge.classList.add('show');
-  triggerScan();
-
-  const t0 = Date.now();
-
-  try {
-    const frameB64 = captureFrame();
-    const result = await callGemini(frameB64);
-    const latency = Date.now() - t0;
-
-    latencyBadge.classList.add('show');
-    latencyBadge.textContent = `${latency}ms`;
-
-    if (result && result.trim() && result !== '[silence]' && result !== lastText) {
-      lastText = result;
-      showSubtitle(result);
-      addLog(result, latency);
-    }
-    apiCalls++;
-    document.getElementById('stat-api').textContent = apiCalls;
-
-  } catch (err) {
-    if (err.message.includes('API_KEY') || err.message.includes('401')) {
-      showToast('❌ API 키가 잘못됐습니다');
-      stopAll();
-    } else {
-      console.error('Gemini error:', err.message);
-    }
+/* ═══════════════════════════════════════════════════
+   FACE MESH RESULTS
+═══════════════════════════════════════════════════ */
+function onResults(results) {
+  oc.clearRect(0,0,overlay.width,overlay.height);
+  if(!results.multiFaceLandmarks?.length){
+    setStatus('No face detected — face the camera','warn');
+    resetVisemeUI();
+    return;
   }
+  if(document.getElementById('statusDot').classList.contains('warn'))
+    setStatus('Lipreading active','on');
 
-  procBadge.classList.remove('show');
-  isAnalyzing = false;
+  const lm=results.multiFaceLandmarks[0];
+  const W=overlay.width,H=overlay.height;
+
+  // subtle face oval
+  oc.globalAlpha=.12;
+  if(typeof drawConnectors!=='undefined'&&typeof FACEMESH_FACE_OVAL!=='undefined')
+    drawConnectors(oc,lm,FACEMESH_FACE_OVAL,{color:'#00E5B4',lineWidth:1});
+  oc.globalAlpha=1;
+
+  drawLips(oc,lm,W,H);
+  const m=computeMetrics(lm,W,H);
+  smoothMAR=lerp(smoothMAR,m.mar,SMOOTH);
+  updateMetricsUI(m);
+  drawMouthCrop(lm,W,H);
+  drawLandmarkMap(lm,W,H);
+
+  const viseme=classify(m);
+  lipHistory.push(viseme.id);
+  if(lipHistory.length>HIST) lipHistory.shift();
+  wordBuf.push(viseme.id);
+  if(wordBuf.length>80) wordBuf.shift();
+
+  const conf=calcConfidence(lipHistory,m);
+  updateVisemeUI(viseme,conf);
+  highlightGrid(viseme.id);
+
+  if(mode!=='viseme') tryDetectWord();
 }
 
-// ── Gemini API Call ───────────────────────────────────
-async function callGemini(imageB64) {
-  const useCrop = !!currentLandmarks;
-  const prompt = useCrop
-    ? `You are an expert lip reader. This is a close-up crop of a person's mouth area.
+/* ═══════════════════════════════════════════════════
+   METRICS
+═══════════════════════════════════════════════════ */
+function computeMetrics(lm,W,H){
+  const p=i=>({x:lm[i].x*W,y:lm[i].y*H});
+  const top=p(P_TOP),bot=p(P_BOT),left=p(P_LEFT),right=p(P_RIGHT);
+  const vert=dist(top,bot),horiz=dist(left,right);
+  const mar=horiz>1?Math.min(vert/horiz,1):0;
+  const roundness=Math.max(0,Math.min(100,Math.round((1-Math.abs(mar-.38)/.38)*100)));
+  const allX=LIP_ALL.map(i=>lm[i].x);
+  const normW=Math.max(...allX)-Math.min(...allX);
+  const openDeg=mar<.04?'Closed':mar<.14?'Slight':mar<.34?'Medium':'Wide';
+  return{mar,vert,horiz,roundness,normW,openDeg};
+}
+function dist(a,b){return Math.hypot(a.x-b.x,a.y-b.y);}
+function lerp(a,b,t){return a+(b-a)*t;}
 
-Read what the person is CURRENTLY saying from the lip shape and position.
-
-Rules:
-- Output ONLY the English words you can read from the lips
-- If mouth is closed or person is not speaking, output exactly: [silence]
-- No descriptions, no labels, no punctuation notes
-- 1–10 words maximum, plain text only`
-    : `You are an expert lip reader. Look at this person's face and read their lips.
-
-Output ONLY the English words being spoken, or [silence] if mouth is closed.
-Plain text, 1–10 words maximum.`;
-
-  const res = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
-    {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents: [{
-          parts: [
-            { inline_data: { mime_type: 'image/jpeg', data: imageB64 } },
-            { text: prompt }
-          ]
-        }],
-        generationConfig: { temperature: 0.1, maxOutputTokens: 60 }
-      })
-    }
-  );
-
-  if (!res.ok) {
-    const err = await res.json();
-    throw new Error(err.error?.message || `HTTP ${res.status}`);
+/* ═══════════════════════════════════════════════════
+   VISEME CLASSIFIER
+═══════════════════════════════════════════════════ */
+function classify(m){
+  let best=VISEMES[VISEMES.length-1],bestS=-Infinity;
+  for(const v of VISEMES){
+    if(v.id==='—') continue;
+    const mOk=m.mar>=v.marR[0]&&m.mar<=v.marR[1];
+    const rOk=m.roundness>=v.roundR[0]&&m.roundness<=v.roundR[1];
+    const wOk=m.normW>=v.widthR[0]&&m.normW<=v.widthR[1];
+    let s=(mOk?3:0)+(rOk?2:0)+(wOk?1:0);
+    s-=Math.abs(m.mar-(v.marR[0]+v.marR[1])/2)*2.5;
+    s-=Math.abs(m.roundness-(v.roundR[0]+v.roundR[1])/2)/55;
+    if(s>bestS){bestS=s;best=v;}
   }
-  const data = await res.json();
-  return data.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || '';
+  if(bestS<0.8) return VISEMES.find(v=>v.id==='—');
+  return best;
 }
 
-// ── UI helpers ────────────────────────────────────────
-function showSubtitle(text) {
-  liveSubtitle.textContent = text;
-  subtitleBox.classList.add('fresh');
-  setTimeout(() => subtitleBox.classList.remove('fresh'), 600);
-  clearTimeout(showSubtitle._timer);
-  showSubtitle._timer = setTimeout(() => {
-    if (liveSubtitle.textContent === text) liveSubtitle.textContent = '—';
-  }, 4000);
+/* ═══════════════════════════════════════════════════
+   CONFIDENCE
+═══════════════════════════════════════════════════ */
+function calcConfidence(hist,m){
+  if(hist.length<4) return 0;
+  const recent=hist.slice(-10);
+  const freq={};
+  recent.forEach(v=>freq[v]=(freq[v]||0)+1);
+  const stability=Math.max(...Object.values(freq))/recent.length;
+  const activity=Math.min(1,m.mar*3.2+.08);
+  return Math.round(stability*activity*100);
 }
 
-function addLog(text, latencyMs) {
-  document.getElementById('empty-log')?.remove();
-  transcripts.push({ text, time: new Date() });
-  wordCount += text.split(/\s+/).filter(Boolean).length;
+/* ═══════════════════════════════════════════════════
+   WORD DETECTION
+═══════════════════════════════════════════════════ */
+function tryDetectWord(){
+  const buf=wordBuf.filter(v=>v!=='—');
+  for(const pat of WORD_PATTERNS){
+    const win=compress(buf.slice(-Math.max(pat.seq.length*2,pat.min)));
+    if(seqMatch(win,pat.seq)){emitWord(pat.word);wordBuf=[];return;}
+  }
+}
+function compress(seq){const o=[];for(const v of seq)if(!o.length||o[o.length-1]!==v)o.push(v);return o;}
+function seqMatch(hay,needle){
+  if(hay.length<needle.length)return false;
+  outer:for(let i=0;i<=hay.length-needle.length;i++){
+    for(let j=0;j<needle.length;j++)if(hay[i+j]!==needle[j])continue outer;
+    return true;
+  }return false;
+}
+function emitWord(word){
+  transcriptWords.push(word);totalWords++;
+  updateTranscript();addChip(word);
+}
 
-  const item = document.createElement('div');
-  item.className = 'log-item';
-  const elapsed = startTime ? formatTime(Date.now() - startTime) : '0:00';
-  const conf = Math.min(100, Math.max(30, 100 - (latencyMs - 500) / 30));
-  const confColor = conf > 70 ? '#00cec9' : conf > 45 ? '#ffd166' : '#ff4d6d';
-
-  item.innerHTML = `
-    <div class="copy-hint">copy</div>
-    <div class="log-time">${elapsed} · ${latencyMs}ms</div>
-    <div class="log-text">${escHtml(text)}</div>
-    <div class="conf-bar"><div class="conf-fill" style="width:${conf}%;background:${confColor}"></div></div>
-  `;
-  item.addEventListener('click', () => {
-    navigator.clipboard.writeText(text).then(() => showToast('✅ Copied'));
+/* ═══════════════════════════════════════════════════
+   DRAWING
+═══════════════════════════════════════════════════ */
+function drawLips(ctx,lm,W,H){
+  // Outer lip polygon
+  ctx.beginPath();
+  LIP_OUTER.forEach((i,n)=>{const x=lm[i].x*W,y=lm[i].y*H;n===0?ctx.moveTo(x,y):ctx.lineTo(x,y);});
+  ctx.closePath();
+  ctx.strokeStyle='rgba(0,229,180,.88)';ctx.lineWidth=2;ctx.stroke();
+  ctx.fillStyle='rgba(0,229,180,.07)';ctx.fill();
+  // Inner lip polygon
+  ctx.beginPath();
+  LIP_INNER.forEach((i,n)=>{const x=lm[i].x*W,y=lm[i].y*H;n===0?ctx.moveTo(x,y):ctx.lineTo(x,y);});
+  ctx.closePath();
+  ctx.strokeStyle='rgba(0,229,180,.5)';ctx.lineWidth=1.5;ctx.stroke();
+  ctx.fillStyle='rgba(0,229,180,.1)';ctx.fill();
+  // Key anchor dots
+  [P_LEFT,P_RIGHT,P_TOP,P_BOT].forEach(i=>{
+    ctx.beginPath();ctx.arc(lm[i].x*W,lm[i].y*H,3,0,Math.PI*2);
+    ctx.fillStyle='#00E5B4';ctx.fill();
   });
-  logEl.appendChild(item);
-  logEl.scrollTop = logEl.scrollHeight;
-  document.getElementById('stat-words').textContent = wordCount;
-  document.getElementById('stat-lines').textContent = transcripts.length;
+  // Vertical height indicator
+  ctx.beginPath();
+  ctx.setLineDash([3,3]);
+  ctx.moveTo(lm[P_TOP].x*W,lm[P_TOP].y*H);
+  ctx.lineTo(lm[P_BOT].x*W,lm[P_BOT].y*H);
+  ctx.strokeStyle='rgba(0,229,180,.35)';ctx.lineWidth=1;ctx.stroke();
+  ctx.setLineDash([]);
 }
 
-function triggerScan() {
-  scanLine.classList.remove('active');
-  void scanLine.offsetWidth;
-  scanLine.classList.add('active');
+function drawMouthCrop(lm,W,H){
+  const xs=LIP_OUTER.map(i=>lm[i].x*W);
+  const ys=LIP_OUTER.map(i=>lm[i].y*H);
+  const minX=Math.min(...xs)-14,maxX=Math.max(...xs)+14;
+  const minY=Math.min(...ys)-10,maxY=Math.max(...ys)+10;
+  const sw=maxX-minX,sh=maxY-minY;
+  mc.clearRect(0,0,mouthC.width,mouthC.height);
+  mc.save();mc.scale(-1,1);mc.translate(-mouthC.width,0);
+  mc.drawImage(videoEl,W-maxX,minY,sw,sh,0,0,mouthC.width,mouthC.height);
+  mc.restore();
+  // crosshair grid
+  mc.strokeStyle='rgba(0,229,180,.18)';mc.lineWidth=.5;
+  for(let x=0;x<mouthC.width;x+=18){mc.beginPath();mc.moveTo(x,0);mc.lineTo(x,mouthC.height);mc.stroke();}
+  for(let y=0;y<mouthC.height;y+=18){mc.beginPath();mc.moveTo(0,y);mc.lineTo(mouthC.width,y);mc.stroke();}
 }
 
-function setStatus(state, label) {
-  statusText.textContent = label;
-  statusDot.className = 'status-dot' + (state === 'active' ? ' active' : state === 'error' ? ' error' : '');
+function drawLandmarkMap(lm,W,H){
+  const cw=landmarkC.width=landmarkC.offsetWidth||280;
+  const ch=landmarkC.height=80;
+  lc.clearRect(0,0,cw,ch);
+  lc.fillStyle='#1C1C26';lc.fillRect(0,0,cw,ch);
+  const xs=LIP_ALL.map(i=>lm[i].x),ys=LIP_ALL.map(i=>lm[i].y);
+  const minX=Math.min(...xs),maxX=Math.max(...xs);
+  const minY=Math.min(...ys),maxY=Math.max(...ys);
+  const sx=cw*.82/(maxX-minX||.001),sy=ch*.82/(maxY-minY||.001);
+  const ox=cw*.09,oy=ch*.09;
+  const proj=i=>({x:cw-((lm[i].x-minX)*sx+ox),y:(lm[i].y-minY)*sy+oy});
+  lc.strokeStyle='rgba(0,229,180,.3)';lc.lineWidth=1;
+  [LIP_OUTER,LIP_INNER].forEach(ring=>{
+    lc.beginPath();
+    ring.forEach((i,n)=>{const p=proj(i);n===0?lc.moveTo(p.x,p.y):lc.lineTo(p.x,p.y);});
+    lc.closePath();lc.stroke();
+  });
+  LIP_ALL.forEach(i=>{const p=proj(i);lc.beginPath();lc.arc(p.x,p.y,2,0,Math.PI*2);lc.fillStyle='#00E5B4';lc.fill();});
 }
 
-function showToast(msg) {
-  const t = document.getElementById('toast');
-  t.textContent = msg;
-  t.classList.add('show');
-  clearTimeout(showToast._t);
-  showToast._t = setTimeout(() => t.classList.remove('show'), 2800);
+/* ═══════════════════════════════════════════════════
+   UI UPDATES
+═══════════════════════════════════════════════════ */
+function updateMetricsUI(m){
+  document.getElementById('mMAR').textContent=m.mar.toFixed(2);
+  document.getElementById('bMAR').style.width=Math.min(100,m.mar*150)+'%';
+  document.getElementById('mOpen').textContent=m.openDeg;
+  document.getElementById('bOpen').style.width=Math.min(100,m.mar*140)+'%';
+  document.getElementById('mWidth').textContent=Math.round(m.horiz)+'px';
+  document.getElementById('bWidth').style.width=Math.min(100,m.normW*200)+'%';
+  document.getElementById('mRound').textContent=m.roundness+'%';
+  document.getElementById('bRound').style.width=m.roundness+'%';
+  document.getElementById('mcMAR').classList.toggle('active',m.mar>.04);
 }
 
-function formatTime(ms) {
-  const s = Math.floor(ms / 1000);
-  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+function updateVisemeUI(v,conf){
+  const el=document.getElementById('visemeCurrent');
+  if(el.textContent!==v.id){el.style.transform='scale(1.2)';setTimeout(()=>el.style.transform='scale(1)',110);}
+  el.textContent=v.id;
+  document.getElementById('visemeLabel').textContent=v.ipa||'neutral';
+  document.getElementById('visemeDesc').innerHTML=v.example||'';
+  document.getElementById('confPct').textContent=conf+'%';
+  const circ=2*Math.PI*26;
+  document.getElementById('ringFill').style.strokeDashoffset=circ-(conf/100)*circ;
 }
 
-function escHtml(s) {
-  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+function highlightGrid(id){
+  document.querySelectorAll('.vg-cell').forEach(c=>c.classList.remove('lit'));
+  const safe=id.replace(/\//g,'_');
+  const cell=document.getElementById('vg_'+safe);
+  if(cell) cell.classList.add('lit');
 }
 
-// ── Start / Stop ──────────────────────────────────────
-async function startAll() {
-  // Init FaceMesh on first start
-  if (!faceMesh) initFaceMesh();
-
-  const ok = await startCamera();
-  if (!ok) return;
-
-  isRunning = true;
-  lastText = '';
-  startTime = Date.now();
-
-  setStatus('active', 'Reading lips…');
-  document.getElementById('btn-start').disabled = true;
-  document.getElementById('btn-stop').disabled = false;
-
-  timerInterval = setInterval(() => {
-    document.getElementById('stat-time').textContent = formatTime(Date.now() - startTime);
-  }, 1000);
-
-  captureInterval = setInterval(captureAndAnalyze, intervalMs);
+function resetVisemeUI(){
+  updateVisemeUI(VISEMES.find(v=>v.id==='—'),0);
+  highlightGrid('—');
 }
 
-function stopAll() {
-  isRunning = false;
-  clearInterval(captureInterval);
-  clearInterval(timerInterval);
-  stopCamera();
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
-  liveSubtitle.textContent = '—';
-  procBadge.classList.remove('show');
-  latencyBadge.classList.remove('show');
-  setStatus('idle', 'Ready');
-  document.getElementById('btn-start').disabled = false;
-  document.getElementById('btn-stop').disabled = true;
+function updateTranscript(){
+  const box=document.getElementById('transcriptBox');
+  const words=transcriptWords.slice(-100);
+  box.innerHTML=words.map((w,i)=>
+    `<span${i===words.length-1?' style="color:var(--pulse)"':''}>${w}</span>`
+  ).join(' ')+' <span class="cursor-blink"></span>';
+  document.getElementById('wordCount').textContent=totalWords+' word'+(totalWords!==1?'s':'');
+  box.scrollTop=box.scrollHeight;
 }
 
-// ── Events ────────────────────────────────────────────
-document.getElementById('btn-start').addEventListener('click', startAll);
-document.getElementById('btn-stop').addEventListener('click', stopAll);
+function addChip(word){
+  const s=document.getElementById('wordStream');
+  const c=document.createElement('div');
+  c.className='word-chip new';c.textContent=word;
+  s.appendChild(c);setTimeout(()=>c.classList.remove('new'),600);
+  s.scrollTop=s.scrollHeight;
+  if(s.children.length>40)s.removeChild(s.firstChild);
+}
 
-document.getElementById('btn-clear').addEventListener('click', () => {
-  transcripts = []; wordCount = 0;
-  logEl.innerHTML = '';
-  const e = document.createElement('div');
-  e.className = 'empty-log'; e.id = 'empty-log';
-  e.innerHTML = '<div class="e-icon">💬</div><p>립리딩으로 인식된 텍스트가<br>여기에 표시됩니다.</p>';
-  logEl.appendChild(e);
-  document.getElementById('stat-words').textContent = '0';
-  document.getElementById('stat-lines').textContent = '0';
-  liveSubtitle.textContent = '—';
-  lastText = '';
-});
+function setStatus(text,type){
+  document.getElementById('statusText').textContent=text;
+  const d=document.getElementById('statusDot');
+  d.className='status-dot'+(type?' '+type:'');
+}
+function showLoader(msg){document.getElementById('loaderMsg').textContent=msg||'';document.getElementById('loaderOverlay').classList.add('show');}
+function hideLoader(){document.getElementById('loaderOverlay').classList.remove('show');}
+function showError(msg){const t=document.getElementById('errorToast');t.textContent='⚠ '+msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),6000);}
 
-document.getElementById('btn-copy-all').addEventListener('click', () => {
-  const all = transcripts.map(t => t.text).join('\n');
-  if (!all) { showToast('Nothing to copy'); return; }
-  navigator.clipboard.writeText(all).then(() => showToast('✅ All copied!'));
-});
+function clearAll(){
+  transcriptWords=[];wordBuf=[];lipHistory=[];totalWords=0;
+  document.getElementById('transcriptBox').innerHTML='<span style="color:var(--muted)">Lipreading output will appear here...</span>';
+  document.getElementById('wordStream').innerHTML='';
+  document.getElementById('wordCount').textContent='0 words';
+  resetVisemeUI();
+  ['mMAR','mOpen','mWidth','mRound'].forEach(id=>document.getElementById(id).textContent='—');
+  ['bMAR','bOpen','bWidth','bRound'].forEach(id=>document.getElementById(id).style.width='0%');
+}
 
-document.getElementById('btn-export').addEventListener('click', () => {
-  if (!transcripts.length) { showToast('No data to export'); return; }
-  const content = transcripts.map(t =>
-    `[${formatTime(t.time - startTime)}] ${t.text}`
-  ).join('\n');
-  const blob = new Blob([content], { type: 'text/plain' });
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = `lipreading-${new Date().toISOString().slice(0,10)}.txt`;
-  a.click();
-  showToast('📄 Exported!');
-});
-
-document.getElementById('font-slider').addEventListener('input', e => {
-  liveSubtitle.style.fontSize = e.target.value + 'px';
-});
+function setMode(m){
+  mode=m;
+  ['Viseme','Word','Sentence'].forEach(t=>{
+    document.getElementById('tab'+t).classList.toggle('active',t.toLowerCase()===m);
+  });
+}
 </script>
 </body>
 </html>
-
